@@ -3,3 +3,6 @@ node_modules
 .vscode-test/
 *.vsix
 _testFileStructureFunctionality
+.gitignore
+.vscodeignore
+vsc-extension-quickstart.md
