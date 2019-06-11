@@ -74,7 +74,7 @@ fs.readdir('.', function (err, files) {
   const currentPath = path.resolve(__dirname).replace(/.*\//, '');
   if (err) { throw err; }
   for (let i in files) {
-    if (fs.existsSync(files[i]) && fs.lstatSync(files[i]).isDirectory()) {
+    if (fs.existsSync(files[i]) && fs.lstatSync(files[i]).isDirectory()) { // if current file is a directory
       console.log(files[i]);
     }
   }
