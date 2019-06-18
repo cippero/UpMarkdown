@@ -71,6 +71,8 @@ var sampleIPath = {
         'link': [1, 1]
     }
 };
+var sampleIPath2 = { path: 'path' };
+console.log(sampleIPath2.links);
 var getFS = function () {
     return {
         'file1': { path: '/path', links: { 'name-of-file': [50, 12] } },
@@ -89,23 +91,28 @@ var getFS = function () {
 //     if (filename) { console.log(`${filename}: ${eventType}`); }
 //   });
 // });
-var addToStaging = function (fileName, filePath) {
+var addFileToStaging = function (fileName, filePath) {
     // file exists in db? update : add;
     // console.log(`file value is: "${file}"`);
     // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
     if (typeof db[fileName] !== 'undefined') {
-        console.log("2. Updated " + fileName + ".");
+        if (db[fileName] !== filePath) {
+            addOrUpdateFile(fileName, filePath);
+            console.log("2. Updated " + fileName + ".");
+        }
+        console.log("2. " + fileName + " wasn't modified. Didn't update.");
     }
     else {
+        addOrUpdateFile(fileName, filePath);
         console.log("2. Added " + fileName + ".");
     }
-    db[fileName] = filePath;
 };
+var addOrUpdateFile = function (fileName, filePath) { return db[fileName] = filePath; };
 fs.watch(__dirname, { recursive: true }, function (eventType, filename) {
     if (filename) {
         console.log("1. " + filename + ": " + eventType);
         if (eventType === "rename") {
-            addToStaging('file1', sampleIPath);
+            addFileToStaging('file1', sampleIPath);
             console.log('3.', db);
         }
     }
