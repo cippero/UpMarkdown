@@ -51,11 +51,12 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 5. To convert app into continuously link updating, use fs.watch() to watch for files emitting the "rename" event:
 
 "change" = file was edited => nothing
-"rename" = file was renamed OR moved => update references TO the file & FROM the file
+"rename" = file was renamed OR moved OR deleted => update references TO the file & FROM the file
 
 */
 
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 interface IPaths {
   [prop: string]: IPath; //fileName: file props
@@ -69,67 +70,75 @@ interface IPath {
   };
 }
 
-let db: IPaths = {
-  'file': {
-    path: 'path',
-    links: {
-      'link': [0, 0]
-    }
-  }
-};
-
 const sampleIPath: IPath = {
-  path: 'path',
+  path: 'samplePath',
   links: {
-    'link': [1, 1]
+    'sampleLink': [1, 1]
   }
 };
 
-const getFS = (): IPaths => {
-  return {
-    'file1': { path: '/path', links: { 'name-of-file': [50, 12] } },
-    'file2': { path: '/path2', links: { 'name-of-file': [100, 12] } }
-  };
+let dbSample: IPaths = {
+  'sampleFile': sampleIPath
 };
 
-// fs.readdir('.', (err, files): void => {
-//   if (err) { throw err; }
-//   const currentDirectory = __dirname.replace(/.*\//, '');
-//   for (let i in files) {
-//     if (fs.existsSync(files[i]) && fs.lstatSync(files[i]).isDirectory()) { // if current file is a directory
-//       console.log(files[i]);
-//     }
-//   }
-//   fs.watch(__dirname, { recursive: true }, (eventType, filename): void => {
-//     if (filename) { console.log(`${filename}: ${eventType}`); }
-//   });
-// });
+class UpMarkdown {
+  // private db: IPaths = dbSample;
+  private db = {} as IPaths;
 
+  //scan for fs snapshot initially (and when a file is edited?)
+  scanFiles(): void {
+    fs.readdir('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality', (err, files): void => {
+      // fs.readdir('.', (err, files): void => {
+      if (err) { throw err; }
+      const currentDirectory = __dirname.replace(/.*\//, '');
+      for (let file in files) {
+        // if (fs.existsSync(files[file]) && fs.lstatSync(files[file]).isDirectory()) { // if current file is a directory
+        if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
+          console.log(files[file]);
+          let data = fs.readFileSync(files[file], 'utf8');
+          // let links = this.extractLinks(data);
+          let hash = crypto.createHash('md5').update(data).digest("hex");
+          console.log(hash);
+        }
+      }
+    });
+  }
 
-const addFileToStaging = (fileName: string, filePath: IPath): void => {
-  // file exists in db? update : add;
-  // console.log(`file value is: "${file}"`);
-  // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
-  if (typeof db[fileName] !== 'undefined') {
-    if (db[fileName] !== filePath) {
-      addOrUpdateFile(fileName, filePath);
-      console.log(`2. Updated ${fileName}.`);
+  extractLinks(data: string): void {
+    const links = data.match(/\[(.+)\])\[|\(/g);
+    console.log(links);
+  }
+
+  //add or update the file's data in the fs snapshot
+  addFileToStorage(fileName: string, filePath: IPath): void {
+    // file exists in db? update : add;
+    // console.log(`file value is: "${file}"`);
+    // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
+    if (typeof this.db[fileName] !== 'undefined') {
+      if (this.db[fileName] !== filePath) {
+        this.db[fileName] = filePath;
+        console.log(`2. Updated ${fileName}.`);
+      }
+      console.log(`2. ${fileName} wasn't modified. Didn't update.`);
+    } else {
+      this.db[fileName] = filePath;
+      console.log(`2. Added ${fileName}.`);
     }
-    console.log(`2. ${fileName} wasn't modified. Didn't update.`);
-  } else {
-    addOrUpdateFile(fileName, filePath);
-    console.log(`2. Added ${fileName}.`);
   }
-};
 
-const addOrUpdateFile = (fileName: string, filePath: IPath): IPath => db[fileName] = filePath;
-
-fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
-  if (filename) {
-    console.log(`1. ${filename}: ${eventType}`);
-    if (eventType === "rename") {
-      addFileToStaging('file1', sampleIPath);
-      console.log('3.', db);
-    }
+  //watch for file edits
+  watchFiles(): void {
+    fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
+      if (filename) {
+        console.log(`1. ${filename}: ${eventType}`);
+        if (eventType === 'rename') {
+          this.addFileToStorage('file1', sampleIPath);
+          console.log('3.', this.db);
+        }
+      }
+    });
   }
-});
+}
+
+const uMd = new UpMarkdown();
+uMd.scanFiles();
