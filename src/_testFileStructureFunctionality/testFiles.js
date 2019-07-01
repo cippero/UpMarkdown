@@ -57,11 +57,15 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 */
 exports.__esModule = true;
 var fs = require("fs");
-var partition = require('lodash.partition');
+var crypto = require("crypto");
 var sampleIPath = {
     path: 'samplePath',
+    hash: 'temp',
     links: {
-        'sampleLink': [1, 1]
+        'sampleLink': {
+            locationInFile: 1,
+            lengthOfLink: 1
+        }
     }
 };
 var dbSample = {
@@ -71,51 +75,79 @@ var UpMarkdown = /** @class */ (function () {
     function UpMarkdown() {
         this.db = {};
     }
+    UpMarkdown.prototype.printStorage = function () {
+        console.log("***************************************\n" + JSON.stringify(this.db));
+        for (var item in this.db) {
+            console.log("######################################\n" + item);
+        }
+    };
     //scan for fs snapshot initially (and when a file is edited?)
-    UpMarkdown.prototype.scanFiles = function () {
-        fs.readdir('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality', function (err, files) {
-            // fs.readdir(__dirname, (err, files): void => {
+    UpMarkdown.prototype.scanFiles = function (directory) {
+        var _this = this;
+        fs.readdir(directory, function (err, files) {
             if (err) {
                 throw err;
             }
+            // console.log(directory);
             // const currentDirectory = __dirname.replace(/.*\//, '');
-            var _a = partition(files, function (file) {
-                return fs.existsSync(__dirname + '/' + file) // if current file exists
-                    && !fs.lstatSync(__dirname + '/' + file).isDirectory() // and isn't a directory
-                    && /^.+\.md$/.test(__dirname + '/' + file); // and ends in *.md
-            }), markdowns = _a[0], folders = _a[1];
-            console.log("markdowns: " + markdowns + "\nfolders: " + folders);
-            // for (let file in files) {
-            //   if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
-            //     console.log(files[file]);
-            //     let data = fs.readFileSync(files[file], 'utf8');
-            //     // let links = this.extractLinks(data);
-            //     let hash = crypto.createHash('md5').update(data).digest("hex");
-            //     console.log(hash);
-            //   }
-            // }
+            for (var i in files) {
+                var currentFile = directory + '/' + files[i];
+                if (fs.existsSync(currentFile)) {
+                    var stats = fs.lstatSync(currentFile);
+                    if (stats.isDirectory()) {
+                        // console.log('###', currentFile);
+                        _this.scanFiles(currentFile);
+                    }
+                    else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
+                        // console.log('***', currentFile);
+                        // this.extractLinks(currentFile);
+                        _this.addFileToStorage(files[i], currentFile);
+                    }
+                }
+            }
         });
-    };
-    UpMarkdown.prototype.extractLinks = function (data) {
-        var links = data.match(/\[(.+)\])\[|\(/g);
-        console.log(links);
     };
     //add or update the file's data in the fs snapshot
     UpMarkdown.prototype.addFileToStorage = function (fileName, filePath) {
         // file exists in db? update : add;
         // console.log(`file value is: "${file}"`);
         // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
+        var hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
         if (typeof this.db[fileName] !== 'undefined') {
-            if (this.db[fileName] !== filePath) {
-                this.db[fileName] = filePath;
-                console.log("2. Updated " + fileName + ".");
+            if (this.db[fileName].hash !== hash) {
+                this.updateLinks(filePath);
+                // console.log(`2. Updated LINKS for: ${fileName}.`);
             }
-            console.log("2. " + fileName + " wasn't modified. Didn't update.");
+            if (this.db[fileName].path !== filePath) {
+                this.updatePath(fileName, filePath);
+                // console.log(`2. Updated PATH for: ${fileName}.`);
+            }
         }
         else {
-            this.db[fileName] = filePath;
-            console.log("2. Added " + fileName + ".");
+            this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
+            // console.log(`2. Added ${fileName}.`);
+            console.log('**************************');
+            console.log(this.db);
         }
+        // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
+    };
+    UpMarkdown.prototype.updateLinks = function (filePath) {
+    };
+    UpMarkdown.prototype.updatePath = function (fileName, filePath) {
+    };
+    UpMarkdown.prototype.extractLinks = function (file) {
+        // const data = fs.readFileSync(file, 'utf8');
+        // const hash = crypto.createHash('md5').update(data).digest("hex");
+        // console.log(file);
+        // const links = data.match(/\[(.+)\])\[|\(/g);
+        // console.log(file, hash);
+        return {
+            'link1': { locationInFile: 10, lengthOfLink: 11 },
+            'link2': { locationInFile: 11, lengthOfLink: 12 }
+        };
+    };
+    UpMarkdown.prototype.createSnapshot = function (fileName, path, hash, links) {
+        return { path: path, hash: hash, links: links };
     };
     //watch for file edits
     UpMarkdown.prototype.watchFiles = function () {
@@ -124,7 +156,7 @@ var UpMarkdown = /** @class */ (function () {
             if (filename) {
                 console.log("1. " + filename + ": " + eventType);
                 if (eventType === 'rename') {
-                    _this.addFileToStorage('file1', sampleIPath);
+                    _this.addFileToStorage('file1', sampleIPath.path);
                     console.log('3.', _this.db);
                 }
             }
@@ -133,4 +165,5 @@ var UpMarkdown = /** @class */ (function () {
     return UpMarkdown;
 }());
 var uMd = new UpMarkdown();
-uMd.scanFiles();
+uMd.scanFiles('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality');
+uMd.printStorage();

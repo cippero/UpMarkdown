@@ -57,7 +57,7 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-const partition = require('lodash.partition');
+// const partition = require('lodash.partition');
 
 interface IPaths {
   [filePath: string]: IPath;
@@ -65,21 +65,29 @@ interface IPaths {
 
 interface IPath {
   path: string;
-  links: {
-  } & {
-    [fileName: string]: {
-      locationInFile: number,
-      length: number
-    }
+  hash: string;
+  links: ILink;
+  // links: {
+  // } & {
+  //   [fileName: string]: ILink
+  // };
+}
+
+interface ILink {
+  [fileName: string]: {
+    locationInFile: number;
+    lengthOfLink: number;
   };
 }
 
+
 const sampleIPath: IPath = {
   path: 'samplePath',
+  hash: 'temp',
   links: {
     'sampleLink': {
       locationInFile: 1,
-      length: 1
+      lengthOfLink: 1
     }
   }
 };
@@ -92,49 +100,76 @@ class UpMarkdown {
   private db = {} as IPaths;
 
   //scan for fs snapshot initially (and when a file is edited?)
-  scanFiles(): void {
-    fs.readdir('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality', (err, files): void => {
-      // fs.readdir(__dirname, (err, files): void => {
+  scanFiles(directory: string): void {
+    fs.readdir(directory, (err, files): void => {
       if (err) { throw err; }
+      // console.log(directory);
       // const currentDirectory = __dirname.replace(/.*\//, '');
-      const [markdowns, folders] = partition(files, (file: string) => { // partition by:
-        return fs.existsSync(__dirname + '/' + file)              // if current file exists
-          && !fs.lstatSync(__dirname + '/' + file).isDirectory()  // and isn't a directory
-          && /^.+\.md$/.test(__dirname + '/' + file);             // and ends in *.md
-      });
-      console.log(`markdowns: ${markdowns}\nfolders: ${folders}`);
-      // for (let file in files) {
-      //   if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
-      //     console.log(files[file]);
-      //     let data = fs.readFileSync(files[file], 'utf8');
-      //     // let links = this.extractLinks(data);
-      //     let hash = crypto.createHash('md5').update(data).digest("hex");
-      //     console.log(hash);
-      //   }
-      // }
+      for (let i in files) {
+        const currentFile = directory + '/' + files[i];
+        if (fs.existsSync(currentFile)) {
+          const stats = fs.lstatSync(currentFile);
+          if (stats.isDirectory()) {
+            // console.log('###', currentFile);
+            this.scanFiles(currentFile);
+          }
+          else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
+            // console.log('***', currentFile);
+            // this.extractLinks(currentFile);
+            this.addFileToStorage(files[i], currentFile);
+          }
+        }
+      }
     });
   }
 
-  extractLinks(data: string): void {
-    const links = data.match(/\[(.+)\])\[|\(/g);
-    console.log(links);
-  }
-
   //add or update the file's data in the fs snapshot
-  addFileToStorage(fileName: string, filePath: IPath): void {
+  addFileToStorage(fileName: string, filePath: string): void {
     // file exists in db? update : add;
     // console.log(`file value is: "${file}"`);
     // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
+    const hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
     if (typeof this.db[fileName] !== 'undefined') {
-      if (this.db[fileName] !== filePath) {
-        this.db[fileName] = filePath;
-        console.log(`2. Updated ${fileName}.`);
+      if (this.db[fileName].hash !== hash) {
+        this.updateLinks(filePath);
+        // console.log(`2. Updated LINKS for: ${fileName}.`);
       }
-      console.log(`2. ${fileName} wasn't modified. Didn't update.`);
+      if (this.db[fileName].path !== filePath) {
+        this.updatePath(fileName, filePath);
+        // console.log(`2. Updated PATH for: ${fileName}.`);
+      }
     } else {
-      this.db[fileName] = filePath;
-      console.log(`2. Added ${fileName}.`);
+      this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
+      // console.log(`2. Added ${fileName}.`);
+      console.log('**************************');
+      console.log(this.db);
     }
+    // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
+  }
+
+  updateLinks(filePath: string): void {
+
+  }
+
+  updatePath(fileName: string, filePath: string): void {
+
+  }
+
+  extractLinks(file: string): ILink {
+    // const data = fs.readFileSync(file, 'utf8');
+    // const hash = crypto.createHash('md5').update(data).digest("hex");
+    // console.log(file);
+    // const links = data.match(/\[(.+)\])\[|\(/g);
+    // console.log(file, hash);
+
+    return {
+      'link1': { locationInFile: 10, lengthOfLink: 11 },
+      'link2': { locationInFile: 11, lengthOfLink: 12 }
+    };
+  }
+
+  createSnapshot(fileName: string, path: string, hash: string, links: ILink): IPath {
+    return { path, hash, links };
   }
 
   //watch for file edits
@@ -143,7 +178,7 @@ class UpMarkdown {
       if (filename) {
         console.log(`1. ${filename}: ${eventType}`);
         if (eventType === 'rename') {
-          this.addFileToStorage('file1', sampleIPath);
+          this.addFileToStorage('file1', sampleIPath.path);
           console.log('3.', this.db);
         }
       }
@@ -152,4 +187,4 @@ class UpMarkdown {
 }
 
 const uMd = new UpMarkdown();
-uMd.scanFiles();
+uMd.scanFiles('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality');
