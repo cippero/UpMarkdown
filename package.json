@@ -36,6 +36,8 @@
 		"@types/mocha": "^2.2.42"
 	},
 	"dependencies": {
-		"fs": "0.0.1-security"
+		"@types/lodash.partition": "^4.6.6",
+		"fs": "0.0.1-security",
+		"lodash.partition": "^4.6.0"
 	}
 }

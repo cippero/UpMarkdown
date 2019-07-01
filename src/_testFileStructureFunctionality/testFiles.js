@@ -57,7 +57,7 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 */
 exports.__esModule = true;
 var fs = require("fs");
-var crypto = require("crypto");
+var partition = require('lodash.partition');
 var sampleIPath = {
     path: 'samplePath',
     links: {
@@ -69,27 +69,31 @@ var dbSample = {
 };
 var UpMarkdown = /** @class */ (function () {
     function UpMarkdown() {
-        // private db: IPaths = dbSample;
         this.db = {};
     }
     //scan for fs snapshot initially (and when a file is edited?)
     UpMarkdown.prototype.scanFiles = function () {
         fs.readdir('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality', function (err, files) {
-            // fs.readdir('.', (err, files): void => {
+            // fs.readdir(__dirname, (err, files): void => {
             if (err) {
                 throw err;
             }
-            var currentDirectory = __dirname.replace(/.*\//, '');
-            for (var file in files) {
-                // if (fs.existsSync(files[file]) && fs.lstatSync(files[file]).isDirectory()) { // if current file is a directory
-                if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
-                    console.log(files[file]);
-                    var data = fs.readFileSync(files[file], 'utf8');
-                    // let links = this.extractLinks(data);
-                    var hash = crypto.createHash('md5').update(data).digest("hex");
-                    console.log(hash);
-                }
-            }
+            // const currentDirectory = __dirname.replace(/.*\//, '');
+            var _a = partition(files, function (file) {
+                return fs.existsSync(__dirname + '/' + file) // if current file exists
+                    && !fs.lstatSync(__dirname + '/' + file).isDirectory() // and isn't a directory
+                    && /^.+\.md$/.test(__dirname + '/' + file); // and ends in *.md
+            }), markdowns = _a[0], folders = _a[1];
+            console.log("markdowns: " + markdowns + "\nfolders: " + folders);
+            // for (let file in files) {
+            //   if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
+            //     console.log(files[file]);
+            //     let data = fs.readFileSync(files[file], 'utf8');
+            //     // let links = this.extractLinks(data);
+            //     let hash = crypto.createHash('md5').update(data).digest("hex");
+            //     console.log(hash);
+            //   }
+            // }
         });
     };
     UpMarkdown.prototype.extractLinks = function (data) {

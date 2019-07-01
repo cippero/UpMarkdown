@@ -57,23 +57,30 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+const partition = require('lodash.partition');
 
 interface IPaths {
-  [prop: string]: IPath; //fileName: file props
+  [filePath: string]: IPath;
 }
 
 interface IPath {
   path: string;
   links: {
   } & {
-    [prop: string]: [number, number], //fileName: [location, length]
+    [fileName: string]: {
+      locationInFile: number,
+      length: number
+    }
   };
 }
 
 const sampleIPath: IPath = {
   path: 'samplePath',
   links: {
-    'sampleLink': [1, 1]
+    'sampleLink': {
+      locationInFile: 1,
+      length: 1
+    }
   }
 };
 
@@ -82,25 +89,29 @@ let dbSample: IPaths = {
 };
 
 class UpMarkdown {
-  // private db: IPaths = dbSample;
   private db = {} as IPaths;
 
   //scan for fs snapshot initially (and when a file is edited?)
   scanFiles(): void {
     fs.readdir('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality', (err, files): void => {
-      // fs.readdir('.', (err, files): void => {
+      // fs.readdir(__dirname, (err, files): void => {
       if (err) { throw err; }
-      const currentDirectory = __dirname.replace(/.*\//, '');
-      for (let file in files) {
-        // if (fs.existsSync(files[file]) && fs.lstatSync(files[file]).isDirectory()) { // if current file is a directory
-        if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
-          console.log(files[file]);
-          let data = fs.readFileSync(files[file], 'utf8');
-          // let links = this.extractLinks(data);
-          let hash = crypto.createHash('md5').update(data).digest("hex");
-          console.log(hash);
-        }
-      }
+      // const currentDirectory = __dirname.replace(/.*\//, '');
+      const [markdowns, folders] = partition(files, (file: string) => { // partition by:
+        return fs.existsSync(__dirname + '/' + file)              // if current file exists
+          && !fs.lstatSync(__dirname + '/' + file).isDirectory()  // and isn't a directory
+          && /^.+\.md$/.test(__dirname + '/' + file);             // and ends in *.md
+      });
+      console.log(`markdowns: ${markdowns}\nfolders: ${folders}`);
+      // for (let file in files) {
+      //   if (fs.existsSync(files[file]) && !fs.lstatSync(files[file]).isDirectory() && /^.+\.md$/.test('' + files[file])) {
+      //     console.log(files[file]);
+      //     let data = fs.readFileSync(files[file], 'utf8');
+      //     // let links = this.extractLinks(data);
+      //     let hash = crypto.createHash('md5').update(data).digest("hex");
+      //     console.log(hash);
+      //   }
+      // }
     });
   }
 
