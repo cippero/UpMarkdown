@@ -63,24 +63,19 @@ var sampleIPath = {
     hash: 'temp',
     links: {
         'sampleLink': {
+            relativePath: '../',
             locationInFile: 1,
             lengthOfLink: 1
         }
     }
 };
 var dbSample = {
-    'sampleFile': sampleIPath
+// 'sampleFile': sampleIPath
 };
 var UpMarkdown = /** @class */ (function () {
-    function UpMarkdown() {
-        this.db = {};
+    function UpMarkdown(dbTemp) {
+        this.db = dbTemp;
     }
-    UpMarkdown.prototype.printStorage = function () {
-        console.log("***************************************\n" + JSON.stringify(this.db));
-        for (var item in this.db) {
-            console.log("######################################\n" + item);
-        }
-    };
     //scan for fs snapshot initially (and when a file is edited?)
     UpMarkdown.prototype.scanFiles = function (directory) {
         var _this = this;
@@ -91,6 +86,7 @@ var UpMarkdown = /** @class */ (function () {
             // console.log(directory);
             // const currentDirectory = __dirname.replace(/.*\//, '');
             for (var i in files) {
+                // if (files[i] !== 'file0.md') { continue; }
                 var currentFile = directory + '/' + files[i];
                 if (fs.existsSync(currentFile)) {
                     var stats = fs.lstatSync(currentFile);
@@ -136,15 +132,29 @@ var UpMarkdown = /** @class */ (function () {
     UpMarkdown.prototype.updatePath = function (fileName, filePath) {
     };
     UpMarkdown.prototype.extractLinks = function (file) {
-        // const data = fs.readFileSync(file, 'utf8');
+        var data = fs.readFileSync(file, 'utf8');
+        var re = new RegExp(/(?<=!?\[.+?\]\(|:\s)(.+?)\)/, 'g');
+        var match, matches = {};
+        while ((match = re.exec(data)) !== null) {
+            var fileName = void 0, relativePath = void 0, div = match[1].lastIndexOf("/");
+            fileName = match[1].substring(div + 1);
+            relativePath = match[1].substring(0, div + 1);
+            matches[fileName] = {
+                relativePath: relativePath,
+                locationInFile: match.index,
+                lengthOfLink: match[1].length
+            };
+        }
+        // console.log(matches);
+        return matches;
         // const hash = crypto.createHash('md5').update(data).digest("hex");
         // console.log(file);
         // const links = data.match(/\[(.+)\])\[|\(/g);
         // console.log(file, hash);
-        return {
-            'link1': { locationInFile: 10, lengthOfLink: 11 },
-            'link2': { locationInFile: 11, lengthOfLink: 12 }
-        };
+        // return {
+        //   'link1/something.md': { locationInFile: 10, lengthOfLink: 11 },
+        //   'link2/another-thing.md': { locationInFile: 11, lengthOfLink: 12 }
+        // };
     };
     UpMarkdown.prototype.createSnapshot = function (fileName, path, hash, links) {
         return { path: path, hash: hash, links: links };
@@ -164,6 +174,13 @@ var UpMarkdown = /** @class */ (function () {
     };
     return UpMarkdown;
 }());
-var uMd = new UpMarkdown();
-uMd.scanFiles('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality');
-uMd.printStorage();
+var uMd = new UpMarkdown(dbSample);
+uMd.scanFiles(__dirname);
+var printLinks = function () {
+    setTimeout(function () {
+        for (var file in uMd.db) {
+            console.log(uMd.db[file].links);
+        }
+    }, 1000);
+};
+printLinks();

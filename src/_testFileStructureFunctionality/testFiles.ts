@@ -75,6 +75,7 @@ interface IPath {
 
 interface ILink {
   [fileName: string]: {
+    relativePath: string;
     locationInFile: number;
     lengthOfLink: number;
   };
@@ -86,6 +87,7 @@ const sampleIPath: IPath = {
   hash: 'temp',
   links: {
     'sampleLink': {
+      relativePath: '../',
       locationInFile: 1,
       lengthOfLink: 1
     }
@@ -93,11 +95,14 @@ const sampleIPath: IPath = {
 };
 
 let dbSample: IPaths = {
-  'sampleFile': sampleIPath
+  // 'sampleFile': sampleIPath
 };
 
 class UpMarkdown {
-  private db = {} as IPaths;
+  db: IPaths;
+  constructor(dbTemp: IPaths) {
+    this.db = dbTemp;
+  }
 
   //scan for fs snapshot initially (and when a file is edited?)
   scanFiles(directory: string): void {
@@ -106,6 +111,7 @@ class UpMarkdown {
       // console.log(directory);
       // const currentDirectory = __dirname.replace(/.*\//, '');
       for (let i in files) {
+        // if (files[i] !== 'file0.md') { continue; }
         const currentFile = directory + '/' + files[i];
         if (fs.existsSync(currentFile)) {
           const stats = fs.lstatSync(currentFile);
@@ -156,16 +162,22 @@ class UpMarkdown {
   }
 
   extractLinks(file: string): ILink {
-    // const data = fs.readFileSync(file, 'utf8');
-    // const hash = crypto.createHash('md5').update(data).digest("hex");
-    // console.log(file);
-    // const links = data.match(/\[(.+)\])\[|\(/g);
-    // console.log(file, hash);
+    const data: string = fs.readFileSync(file, 'utf8');
+    const re: RegExp = new RegExp(/(?<=!?\[.+?\]\(|:\s)(.+?)\)/, 'g');
+    let match, matches: ILink = {};
 
-    return {
-      'link1': { locationInFile: 10, lengthOfLink: 11 },
-      'link2': { locationInFile: 11, lengthOfLink: 12 }
-    };
+    while ((match = re.exec(data)) !== null) {
+      let fileName: string, relativePath: string, div: number = match[1].lastIndexOf("/");
+      fileName = match[1].substring(div + 1);
+      relativePath = match[1].substring(0, div + 1);
+
+      matches[fileName] = {
+        relativePath,
+        locationInFile: match.index,
+        lengthOfLink: match[1].length,
+      };
+    }
+    return matches;
   }
 
   createSnapshot(fileName: string, path: string, hash: string, links: ILink): IPath {
@@ -186,5 +198,15 @@ class UpMarkdown {
   }
 }
 
-const uMd = new UpMarkdown();
-uMd.scanFiles('/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality');
+const uMd = new UpMarkdown(dbSample);
+uMd.scanFiles(__dirname);
+
+const printLinks = () => {
+  setTimeout(() => {
+    for (let file in uMd.db) {
+      console.log(uMd.db[file].links);
+    }
+  }, 1000);
+};
+
+printLinks();
