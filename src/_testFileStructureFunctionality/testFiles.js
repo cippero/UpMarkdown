@@ -64,18 +64,15 @@ exports.__esModule = true;
 var fs = require("fs");
 var crypto = require("crypto");
 var sampleIPath = {
-    path: 'samplePath',
-    hash: 'temp',
+    path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionalityfile0.md',
+    hash: '9366a95710845fef95979a2d2073b577',
     links: {
-        'sampleLink': {
-            relativePath: '../',
-            locationInFile: 1,
-            lengthOfLink: 1
-        }
+        'file10.md': { relativePath: 'dir1 / ', locationInFile: 85, lengthOfLink: 14 },
+        'test.png': { relativePath: 'media/', locationInFile: 116, lengthOfLink: 14 }
     }
 };
 var dbSample = {
-// 'sampleFile': sampleIPath
+    'file0.md': sampleIPath
 };
 var UpMarkdown = /** @class */ (function () {
     // set: object;
@@ -117,13 +114,20 @@ var UpMarkdown = /** @class */ (function () {
         // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
         var hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
         if (typeof this.db[fileName] !== 'undefined') {
+            console.log("2. " + fileName + " exists.");
             if (this.db[fileName].hash !== hash) {
-                this.updateLinks(filePath);
-                // console.log(`2. Updated LINKS for: ${fileName}.`);
+                this.db[fileName].links = this.extractLinks(filePath);
+                console.log("  Updated $LINKS for " + fileName + ".");
+            }
+            else {
+                console.log("  Didn't update $LINKS for " + fileName + " - hash hasn't changed:\n\n        old: " + this.db[fileName].hash + "\n\n        new: " + hash);
             }
             if (this.db[fileName].path !== filePath) {
-                this.updatePath(fileName, filePath);
-                // console.log(`2. Updated PATH for: ${fileName}.`);
+                this.db[fileName].path = filePath;
+                console.log("  Updated $PATH for " + fileName + ".");
+            }
+            else {
+                console.log("  Didn't update $PATH for " + fileName + " - path hasn't changed:\n\n        old: " + this.db[fileName].path + "\n\n        new: " + filePath);
             }
         }
         else {
@@ -133,15 +137,11 @@ var UpMarkdown = /** @class */ (function () {
                 path: filePath,
                 links: this.extractLinks(filePath)
             };
-            // console.log(`2. Added ${fileName}.`);
+            console.log("2. Added " + fileName + ".");
             console.log('**************************');
-            console.log(this.db);
+            // console.log(this.db);
         }
         // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
-    };
-    UpMarkdown.prototype.updateLinks = function (filePath) {
-    };
-    UpMarkdown.prototype.updatePath = function (fileName, filePath) {
     };
     UpMarkdown.prototype.extractLinks = function (file) {
         var data = fs.readFileSync(file, 'utf8');
@@ -161,7 +161,7 @@ var UpMarkdown = /** @class */ (function () {
     };
     return UpMarkdown;
 }());
-var uMd = new UpMarkdown();
+var uMd = new UpMarkdown(dbSample);
 uMd.scanFiles(__dirname);
 var printLinks = function () {
     var links = 0;
