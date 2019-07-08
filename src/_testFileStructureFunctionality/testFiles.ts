@@ -53,6 +53,16 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 "change" = file was edited => nothing
 "rename" = file was renamed OR moved OR deleted => update references TO the file & FROM the file
 
+*6. When refactoring for watching/automatic updates change db to obj for faster performance
+updating specific files, instead of linear speed looping 
+[ToDo] refactor db object to set
+
+-----------------
+known issues:
+
+- before continuous updates is implemented, changing a file's name and content without scanning in between those actions
+will result in a new snapshot being created in storage without removing the old one, and other issues
+
 */
 
 import * as fs from 'fs';
@@ -83,82 +93,80 @@ interface ILink {
 
 
 const sampleIPath: IPath = {
-  path: 'samplePath',
-  hash: 'temp',
+  path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
+  hash: '9366a95710845fef95979a2d2073b577',
   links: {
-    'sampleLink': {
-      relativePath: '../',
-      locationInFile: 1,
-      lengthOfLink: 1
-    }
+    'file10.md': { relativePath: 'dir1 / ', locationInFile: 85, lengthOfLink: 14 },
+    'test.png': { relativePath: 'media/', locationInFile: 116, lengthOfLink: 14 }
   }
 };
 
 let dbSample: IPaths = {
-  // 'sampleFile': sampleIPath
+  'file0.md': sampleIPath
 };
 
 class UpMarkdown {
   db: IPaths;
-  constructor(dbTemp: IPaths) {
-    this.db = dbTemp;
+  // set: object;
+
+  constructor(dbInput?: IPaths) {
+    this.db = dbInput || {};
+    // this.set = new Set();
   }
 
   //scan for fs snapshot initially (and when a file is edited?)
   scanFiles(directory: string): void {
     fs.readdir(directory, (err, files): void => {
       if (err) { throw err; }
-      // console.log(directory);
-      // const currentDirectory = __dirname.replace(/.*\//, '');
       for (let i in files) {
-        // if (files[i] !== 'file0.md') { continue; }
         const currentFile = directory + '/' + files[i];
         if (fs.existsSync(currentFile)) {
           const stats = fs.lstatSync(currentFile);
           if (stats.isDirectory()) {
-            // console.log('###', currentFile);
             this.scanFiles(currentFile);
           }
           else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
-            // console.log('***', currentFile);
-            // this.extractLinks(currentFile);
-            this.addFileToStorage(files[i], currentFile);
+            this.SaveOrUpdateFile(files[i], currentFile);
           }
         }
       }
     });
   }
 
-  //add or update the file's data in the fs snapshot
-  addFileToStorage(fileName: string, filePath: string): void {
+  //save or update the file's data in storage
+  SaveOrUpdateFile(fileName: string, filePath: string): void {
     // file exists in db? update : add;
-    // console.log(`file value is: "${file}"`);
-    // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
     const hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
     if (typeof this.db[fileName] !== 'undefined') {
+      console.log(`2. ${fileName} already exists in storage.`);
       if (this.db[fileName].hash !== hash) {
-        this.updateLinks(filePath);
-        // console.log(`2. Updated LINKS for: ${fileName}.`);
+        this.db[fileName].links = this.extractLinks(filePath);
+        console.log(`  Updated $LINKS for ${fileName}.`);
+        // } else {
+        // console.log(`  Didn't update $LINKS for ${fileName} - hash hasn't changed:\n
+        // old: ${this.db[fileName].hash}\n
+        // new: ${hash}`);
       }
       if (this.db[fileName].path !== filePath) {
-        this.updatePath(fileName, filePath);
-        // console.log(`2. Updated PATH for: ${fileName}.`);
+        this.db[fileName].path = filePath;
+        console.log(`  Updated $PATH for ${fileName}.`);
+        this.updateRefs(fileName, filePath);
+        // } else {
+        //   console.log(`  Didn't update $PATH for ${fileName} - path hasn't changed:\n
+        //   old: ${this.db[fileName].path}\n
+        //   new: ${filePath}`);
       }
     } else {
-      this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
-      // console.log(`2. Added ${fileName}.`);
+      this.db[fileName] = {
+        hash,
+        path: filePath,
+        links: this.extractLinks(filePath)
+      };
+      console.log(`2. Added ${fileName}.`);
       console.log('**************************');
-      console.log(this.db);
+      // console.log(this.db);
     }
     // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
-  }
-
-  updateLinks(filePath: string): void {
-
-  }
-
-  updatePath(fileName: string, filePath: string): void {
-
   }
 
   extractLinks(file: string): ILink {
@@ -180,32 +188,40 @@ class UpMarkdown {
     return matches;
   }
 
-  createSnapshot(fileName: string, path: string, hash: string, links: ILink): IPath {
-    return { path, hash, links };
+  //update references to current file
+  updateRefs(fileName: string, filePath: string) {
+
   }
 
-  //watch for file edits
-  watchFiles(): void {
-    fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
-      if (filename) {
-        console.log(`1. ${filename}: ${eventType}`);
-        if (eventType === 'rename') {
-          this.addFileToStorage('file1', sampleIPath.path);
-          console.log('3.', this.db);
-        }
-      }
-    });
-  }
+  // //watch for file edits
+  // watchFiles(): void {
+  //   fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
+  //     if (filename) {
+  //       console.log(`1. ${filename}: ${eventType}`);
+  //       if (eventType === 'rename') {
+  //         this.SaveOrUpdateFile('file1', sampleIPath.path);
+  //         console.log('3.', this.db);
+  //       }
+  //     }
+  //   });
+  // }
 }
 
 const uMd = new UpMarkdown(dbSample);
 uMd.scanFiles(__dirname);
 
 const printLinks = () => {
+  let links: number = 0;
   setTimeout(() => {
+    console.log('------------------------');
     for (let file in uMd.db) {
+      links += Object.keys(uMd.db[file].links).length;
       console.log(uMd.db[file].links);
+      //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
+      //   if (fileLinks > 0) { links += fileLinks; }
     }
+    console.log(`${links} links found`);
+    console.log('------------------------');
   }, 1000);
 };
 
