@@ -54,6 +54,11 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 "change" = file was edited => nothing
 "rename" = file was renamed OR moved OR deleted => update references TO the file & FROM the file
 
+*6. When refactoring for watching/automatic updates change db to obj for faster performance
+updating specific files, instead of linear speed looping
+[ToDo] refactor db object to set
+
+
 */
 exports.__esModule = true;
 var fs = require("fs");
@@ -73,8 +78,10 @@ var dbSample = {
 // 'sampleFile': sampleIPath
 };
 var UpMarkdown = /** @class */ (function () {
-    function UpMarkdown(dbTemp) {
-        this.db = dbTemp;
+    // set: object;
+    function UpMarkdown(dbInput) {
+        this.db = dbInput || {};
+        // this.set = new Set();
     }
     //scan for fs snapshot initially (and when a file is edited?)
     UpMarkdown.prototype.scanFiles = function (directory) {
@@ -120,7 +127,12 @@ var UpMarkdown = /** @class */ (function () {
             }
         }
         else {
-            this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
+            // this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
+            this.db[fileName] = {
+                hash: hash,
+                path: filePath,
+                links: this.extractLinks(filePath)
+            };
             // console.log(`2. Added ${fileName}.`);
             console.log('**************************');
             console.log(this.db);
@@ -145,42 +157,24 @@ var UpMarkdown = /** @class */ (function () {
                 lengthOfLink: match[1].length
             };
         }
-        // console.log(matches);
         return matches;
-        // const hash = crypto.createHash('md5').update(data).digest("hex");
-        // console.log(file);
-        // const links = data.match(/\[(.+)\])\[|\(/g);
-        // console.log(file, hash);
-        // return {
-        //   'link1/something.md': { locationInFile: 10, lengthOfLink: 11 },
-        //   'link2/another-thing.md': { locationInFile: 11, lengthOfLink: 12 }
-        // };
-    };
-    UpMarkdown.prototype.createSnapshot = function (fileName, path, hash, links) {
-        return { path: path, hash: hash, links: links };
-    };
-    //watch for file edits
-    UpMarkdown.prototype.watchFiles = function () {
-        var _this = this;
-        fs.watch(__dirname, { recursive: true }, function (eventType, filename) {
-            if (filename) {
-                console.log("1. " + filename + ": " + eventType);
-                if (eventType === 'rename') {
-                    _this.addFileToStorage('file1', sampleIPath.path);
-                    console.log('3.', _this.db);
-                }
-            }
-        });
     };
     return UpMarkdown;
 }());
-var uMd = new UpMarkdown(dbSample);
+var uMd = new UpMarkdown();
 uMd.scanFiles(__dirname);
 var printLinks = function () {
+    var links = 0;
     setTimeout(function () {
+        console.log('------------------------');
         for (var file in uMd.db) {
+            links += Object.keys(uMd.db[file].links).length;
             console.log(uMd.db[file].links);
+            //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
+            //   if (fileLinks > 0) { links += fileLinks; }
         }
+        console.log(links + " links found");
+        console.log('------------------------');
     }, 1000);
 };
 printLinks();
