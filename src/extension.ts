@@ -1,29 +1,41 @@
 import * as vscode from 'vscode';
-// import * as path from 'path';
+import { UpMarkdown as UMD, printLinks } from './_testFileStructureFunctionality/testFiles';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	// console.log('Congratulations, your extension "upmarkdown" is now active!');
-	context.globalState.update("test", undefined);
+  // Use the console to output diagnostic information (console.log) and errors (console.error)
+  // This line of code will only be executed once when your extension is activated
+  // console.log('Congratulations, your extension "upmarkdown" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('extension.helloWorld', () => {
-		const val: string = context.globalState.get("test", "defaultValue");
+  // context.globalState.update("test", "this is test");
 
-		// const folderName = path.dirname(e.path);
-		// const folderUrl = vscode.Uri.file(folderName);
+  // The command has been defined in the package.json file
+  // Now provide the implementation of the command with registerCommand
+  // The commandId parameter must match the command field in package.json
+  const disposable = [
+    vscode.commands.registerCommand('extension.helloWorld', () => {
+      // const folderName = path.dirname(e.path);
+      // const folderUrl = vscode.Uri.file(folderName);
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage(val);
-	});
+      // Display a message box to the user
+      const val: string = context.globalState.get("test", "defaultValue");
+      vscode.window.showInformationMessage(val);
+    }),
+    vscode.commands.registerCommand('extension.updateLinks', () => {
+      const umd = new UMD();
 
-	context.subscriptions.push(disposable);
+      const dir: string = __dirname.slice(0, __dirname.lastIndexOf('/')) + '/src/_testFileStructureFunctionality';
+      // umd.scanFiles(dir);
+      // printLinks(umd.db);
+      console.error('testing umd extension');
+      vscode.window.showInformationMessage('testing umd extension');
+    })
+  ];
+
+  disposable.forEach((command) => context.subscriptions.push(command));
+  // context.subscriptions.push(disposable[0]);
 }
 
 // this method is called when your extension is deactivated

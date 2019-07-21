@@ -105,7 +105,7 @@ let dbSample: IPaths = {
   'file0.md': sampleIPath
 };
 
-class UpMarkdown {
+export class UpMarkdown {
   db: IPaths;
   // set: object;
 
@@ -171,7 +171,7 @@ class UpMarkdown {
 
   extractLinks(file: string): ILink {
     const data: string = fs.readFileSync(file, 'utf8');
-    const re: RegExp = new RegExp(/(?<=!?\[.+?\]\(|:\s)(.+?)\)/, 'g');
+    const re: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
     let match, matches: ILink = {};
 
     while ((match = re.exec(data)) !== null) {
@@ -210,19 +210,22 @@ class UpMarkdown {
 const uMd = new UpMarkdown(dbSample);
 uMd.scanFiles(__dirname);
 
-const printLinks = () => {
+export const printLinks = (db: IPaths) => {
   let links: number = 0;
   setTimeout(() => {
     console.log('------------------------');
-    for (let file in uMd.db) {
-      links += Object.keys(uMd.db[file].links).length;
-      console.log(uMd.db[file].links);
+    for (let file in db) {
+      links += Object.keys(db[file].links).length;
+      let fileName: string = db[file].path.slice(db[file].path.lastIndexOf('/') + 1);
+      console.log(`----${fileName}:`);
+      console.log(db[file].links);
       //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
       //   if (fileLinks > 0) { links += fileLinks; }
     }
     console.log(`${links} links found`);
     console.log('------------------------');
-  }, 1000);
+  }, 100);
 };
 
-printLinks();
+// printLinks(uMd.db);
+

@@ -58,14 +58,19 @@ file1 link to file2 in the text is updated based on new path of file2 minus curr
 updating specific files, instead of linear speed looping
 [ToDo] refactor db object to set
 
+-----------------
+known issues:
+
+- before continuous updates is implemented, changing a file's name and content without scanning in between those actions
+will result in a new snapshot being created in storage without removing the old one, and other issues
 
 */
 exports.__esModule = true;
 var fs = require("fs");
 var crypto = require("crypto");
 var sampleIPath = {
-    path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionalityfile0.md',
-    hash: '9366a95710845fef95979a2d2073b577',
+    path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
+    hash: '9366a95710845fef95979a2d2073b57',
     links: {
         'file10.md': { relativePath: 'dir1 / ', locationInFile: 85, lengthOfLink: 14 },
         'test.png': { relativePath: 'media/', locationInFile: 116, lengthOfLink: 14 }
@@ -87,51 +92,45 @@ var UpMarkdown = /** @class */ (function () {
             if (err) {
                 throw err;
             }
-            // console.log(directory);
-            // const currentDirectory = __dirname.replace(/.*\//, '');
             for (var i in files) {
-                // if (files[i] !== 'file0.md') { continue; }
                 var currentFile = directory + '/' + files[i];
                 if (fs.existsSync(currentFile)) {
                     var stats = fs.lstatSync(currentFile);
                     if (stats.isDirectory()) {
-                        // console.log('###', currentFile);
                         _this.scanFiles(currentFile);
                     }
                     else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
-                        // console.log('***', currentFile);
-                        // this.extractLinks(currentFile);
-                        _this.addFileToStorage(files[i], currentFile);
+                        _this.SaveOrUpdateFile(files[i], currentFile);
                     }
                 }
             }
         });
     };
-    //add or update the file's data in the fs snapshot
-    UpMarkdown.prototype.addFileToStorage = function (fileName, filePath) {
+    //save or update the file's data in storage
+    UpMarkdown.prototype.SaveOrUpdateFile = function (fileName, filePath) {
         // file exists in db? update : add;
-        // console.log(`file value is: "${file}"`);
-        // console.log(`typeof: ${typeof db[file]}, value: ${db[file]}`);
         var hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
         if (typeof this.db[fileName] !== 'undefined') {
-            console.log("2. " + fileName + " exists.");
+            console.log("2. " + fileName + " already exists in storage.");
             if (this.db[fileName].hash !== hash) {
                 this.db[fileName].links = this.extractLinks(filePath);
                 console.log("  Updated $LINKS for " + fileName + ".");
-            }
-            else {
-                console.log("  Didn't update $LINKS for " + fileName + " - hash hasn't changed:\n\n        old: " + this.db[fileName].hash + "\n\n        new: " + hash);
+                // } else {
+                // console.log(`  Didn't update $LINKS for ${fileName} - hash hasn't changed:\n
+                // old: ${this.db[fileName].hash}\n
+                // new: ${hash}`);
             }
             if (this.db[fileName].path !== filePath) {
                 this.db[fileName].path = filePath;
                 console.log("  Updated $PATH for " + fileName + ".");
-            }
-            else {
-                console.log("  Didn't update $PATH for " + fileName + " - path hasn't changed:\n\n        old: " + this.db[fileName].path + "\n\n        new: " + filePath);
+                this.updateRefs(fileName, filePath);
+                // } else {
+                //   console.log(`  Didn't update $PATH for ${fileName} - path hasn't changed:\n
+                //   old: ${this.db[fileName].path}\n
+                //   new: ${filePath}`);
             }
         }
         else {
-            // this.db[fileName] = this.createSnapshot(fileName, filePath, hash, this.extractLinks(filePath));
             this.db[fileName] = {
                 hash: hash,
                 path: filePath,
@@ -145,7 +144,7 @@ var UpMarkdown = /** @class */ (function () {
     };
     UpMarkdown.prototype.extractLinks = function (file) {
         var data = fs.readFileSync(file, 'utf8');
-        var re = new RegExp(/(?<=!?\[.+?\]\(|:\s)(.+?)\)/, 'g');
+        var re = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
         var match, matches = {};
         while ((match = re.exec(data)) !== null) {
             var fileName = void 0, relativePath = void 0, div = match[1].lastIndexOf("/");
@@ -159,6 +158,9 @@ var UpMarkdown = /** @class */ (function () {
         }
         return matches;
     };
+    //update references to current file
+    UpMarkdown.prototype.updateRefs = function (fileName, filePath) {
+    };
     return UpMarkdown;
 }());
 var uMd = new UpMarkdown(dbSample);
@@ -169,12 +171,14 @@ var printLinks = function () {
         console.log('------------------------');
         for (var file in uMd.db) {
             links += Object.keys(uMd.db[file].links).length;
+            var fileName = uMd.db[file].path.slice(uMd.db[file].path.lastIndexOf('/') + 1);
+            console.log("----" + fileName + ":");
             console.log(uMd.db[file].links);
             //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
             //   if (fileLinks > 0) { links += fileLinks; }
         }
         console.log(links + " links found");
         console.log('------------------------');
-    }, 1000);
+    }, 100);
 };
-printLinks();
+// printLinks();
