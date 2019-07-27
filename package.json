@@ -15,7 +15,8 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [{
+    "commands": [
+      {
         "command": "extension.helloWorld",
         "title": "Hello World"
       },
@@ -25,11 +26,13 @@
       }
     ],
     "menus": {
-      "explorer/context": [{
-        "when": "explorerResourceIsFolder",
-        "command": "extension.updateLinks",
-        "group": "navigation"
-      }]
+      "explorer/context": [
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "extension.updateLinks",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {
@@ -47,8 +50,6 @@
     "@types/mocha": "^2.2.42"
   },
   "dependencies": {
-    "@types/lodash.partition": "^4.6.6",
-    "fs": "0.0.1-security",
-    "lodash.partition": "^4.6.0"
+    "fs": "0.0.1-security"
   }
 }

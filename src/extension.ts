@@ -9,7 +9,7 @@ export function activate(context: vscode.ExtensionContext) {
   // This line of code will only be executed once when your extension is activated
   // console.log('Congratulations, your extension "upmarkdown" is now active!');
 
-  // context.globalState.update("test", "this is test");
+  context.globalState.update("test", "this is not test");
 
   // The command has been defined in the package.json file
   // Now provide the implementation of the command with registerCommand
@@ -24,13 +24,12 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(val);
     }),
     vscode.commands.registerCommand('extension.updateLinks', () => {
-      const umd = new UMD();
+      // const dir: string = __dirname.slice(0, __dirname.lastIndexOf('/')) + '/src/_testFileStructureFunctionality';
+      // console.log(`     __dirname: ${__dirname} \nWorkspace path: ${vscode.workspace.rootPath} \nWorkspace name: ${vscode.workspace.name}`);
 
-      const dir: string = __dirname.slice(0, __dirname.lastIndexOf('/')) + '/src/_testFileStructureFunctionality';
-      // umd.scanFiles(dir);
-      // printLinks(umd.db);
-      console.error('testing umd extension');
-      vscode.window.showInformationMessage('testing umd extension');
+      const umd = new UMD();
+      umd.scanFiles(vscode.workspace.rootPath);
+      printLinks(umd.db);
     })
   ];
 
