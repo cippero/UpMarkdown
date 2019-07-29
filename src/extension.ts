@@ -27,9 +27,9 @@ export function activate(context: vscode.ExtensionContext) {
       // const dir: string = __dirname.slice(0, __dirname.lastIndexOf('/')) + '/src/_testFileStructureFunctionality';
       // console.log(`     __dirname: ${__dirname} \nWorkspace path: ${vscode.workspace.rootPath} \nWorkspace name: ${vscode.workspace.name}`);
 
-      const umd = new UMD();
-      umd.scanFiles(vscode.workspace.rootPath);
-      printLinks(umd.db);
+      const Umd = new UMD(vscode.workspace.rootPath || '');
+      Umd.scanFiles(Umd.rootDirectory);
+      printLinks(Umd.db);
     })
   ];
 

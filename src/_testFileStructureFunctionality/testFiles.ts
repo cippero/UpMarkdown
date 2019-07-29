@@ -41,15 +41,19 @@ let dbSample: IPaths = {
 export class UpMarkdown {
   db: IPaths;
   // set: object;
+  rootDirectory: string;
+  reLinks: RegExp;
 
-  constructor(dbInput?: IPaths) {
+  constructor(dirInput: string, dbInput?: IPaths) {
     this.db = dbInput || {};
     // this.set = new Set();
+    this.rootDirectory = dirInput;
+    this.reLinks = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
   }
 
   //scan for fs snapshot initially (and when a file is edited?)
-  scanFiles(directory: any): void {
-    if (typeof directory === 'undefined') { throw new Error('Input directory is undefined'); }
+  scanFiles(directory: string): void {
+    if (directory === '') { throw new Error('No input directory specified.'); }
     fs.readdir(directory, (err, files): void => {
       if (err) { throw err; }
       for (let i in files) {
@@ -107,11 +111,10 @@ export class UpMarkdown {
 
   extractLinks(file: string): ILink {
     const data: string = fs.readFileSync(file, 'utf8');
-    const re: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
     let match, matches: ILink = {};
 
     let iterations: number = 0;
-    while ((match = re.exec(data)) !== null) {
+    while ((match = this.reLinks.exec(data)) !== null) {
       console.log(`Iteration ${iterations++} - RE matches in "${file}": \n  ${match}`);
       // let div: number = match[1].lastIndexOf("/");
       const fileName: string = match[2].substring(match[2].lastIndexOf("/") + 1);
@@ -131,8 +134,22 @@ export class UpMarkdown {
   }
 
   //update references to current file
-  updateRefs(fileName: string, filePath: string) {
+  updateRefs(fileName: string, filePath: string): any {
 
+  }
+
+  updateLinks(): any {
+    // 1. loop through files in db
+    // 2. for every referred link in file, update link based on actual referred file's location
+    for (let file in this.db) {
+      for (let link in this.db[file].links) {
+        this.db[file].links[link] = {
+          relativePath: 'dir1/',
+          locationsInFile: [85],
+          lengthOfLink: 5
+        };
+      }
+    }
   }
 
   // //watch for file edits
@@ -149,8 +166,8 @@ export class UpMarkdown {
   // }
 }
 
-const uMd = new UpMarkdown(dbSample);
-uMd.scanFiles(__dirname);
+const Umd = new UpMarkdown(__dirname, dbSample);
+Umd.scanFiles(Umd.rootDirectory);
 
 export const printLinks = (db: IPaths) => {
   let links: number = 0;
@@ -171,3 +188,6 @@ export const printLinks = (db: IPaths) => {
 
 // printLinks(uMd.db);
 
+/* ------------------------ToDoS
+1. Fix logic not picking up all files/links atm
+*/
