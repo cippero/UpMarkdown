@@ -1,93 +1,31 @@
 "use strict";
-/*
-1. select mother directory and assign Path var to the name of the mother directory
-
-2. recursively look for other directories, if exists go in and add name of directory to Path var
-
-3. if not directory, assign name of file as key with the value as an object with Path var and
-location in file of all links to update (what if two files in different locations have the same name?)
-
-example fs:
-dir1/file1
-dir1/file2
-dir1/dir2
-dir1/dir2/file3
-dir1/dir2/dir3
-dir1/dir2/dir3/file4
-
-- dir1 is mother directory, Path = "dir1"
-- file1 is saved as file1 = {path: path, links: {fileName: (position, length)}}
-file1.path -> "dir1"
-file1.links.file2 -> (600, 32)
-
-
-4. when done saving fs into an object/database, go into each file and update the links in the text.
-*if using relative paths instead of absolute, another step after this one will require to update the
-length value of each link reference*
-
-example fs if file1 has references to both file2 and file3:
-dir1/file1
-dir1/file2
-dir1/dir2/file3
-
-file2 moved to dir2:
-dir1/file1
-dir1/dir2/file2
-dir1/dir2/file3
-
-first, scan and update the fs object:
-file2.path updates from "dir1" to "dir1/dir2", based on Path var
-file2.links stays the same
-file1.path stays the same
-file1.links.file2 stays the same
-
-then, update links:
-file2.path & file2.links stays the same
-file1.path stays the same
-file1 link to file2 in the text is updated based on new path of file2 minus current path
-*file1.links.file2 is updated with the new length
-
-*length doesn't need to be updated if only using absolute paths*
-
-5. To convert app into continuously link updating, use fs.watch() to watch for files emitting the "rename" event:
-
-"change" = file was edited => nothing
-"rename" = file was renamed OR moved OR deleted => update references TO the file & FROM the file
-
-*6. When refactoring for watching/automatic updates change db to obj for faster performance
-updating specific files, instead of linear speed looping
-[ToDo] refactor db object to set
-
------------------
-known issues:
-
-- before continuous updates is implemented, changing a file's name and content without scanning in between those actions
-will result in a new snapshot being created in storage without removing the old one, and other issues
-
-*/
 exports.__esModule = true;
 var fs = require("fs");
 var crypto = require("crypto");
-var sampleIPath = {
-    path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
-    hash: '9366a95710845fef95979a2d2073b57',
-    links: {
-        'file10.md': { relativePath: 'dir1 / ', locationInFile: 85, lengthOfLink: 14 },
-        'test.png': { relativePath: 'media/', locationInFile: 116, lengthOfLink: 14 }
-    }
-};
-var dbSample = {
-    'file0.md': sampleIPath
-};
+// const sampleIPath: IPath = {
+//   path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
+//   hash: '9366a95710845fef95979a2d2073b577',
+//   links: {
+//     'file10.md': { absPath: '', relPath: 'dir1 / ', locationsInFile: [85], lengthOfLink: 14 },
+//     'test.png': { absPath: '', relPath: 'media/', locationsInFile: [116], lengthOfLink: 14 }
+//   }
+// };
+// let dbSample: IPaths = {
+//   'file0.md': sampleIPath
+// };
 var UpMarkdown = /** @class */ (function () {
-    // set: object;
-    function UpMarkdown(dbInput) {
+    function UpMarkdown(dirInput, dbInput) {
+        this._RE = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
         this.db = dbInput || {};
         // this.set = new Set();
+        this.rootDirectory = dirInput;
     }
     //scan for fs snapshot initially (and when a file is edited?)
     UpMarkdown.prototype.scanFiles = function (directory) {
         var _this = this;
+        if (directory === '') {
+            throw new Error('No input directory specified.');
+        }
         fs.readdir(directory, function (err, files) {
             if (err) {
                 throw err;
@@ -101,6 +39,7 @@ var UpMarkdown = /** @class */ (function () {
                     }
                     else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
                         _this.SaveOrUpdateFile(files[i], currentFile);
+                        // console.log(`fileName: ${files[i]} \nfilePath: ${currentFile}`);
                     }
                 }
             }
@@ -131,6 +70,8 @@ var UpMarkdown = /** @class */ (function () {
             }
         }
         else {
+            console.log('**************************');
+            console.log("2. Adding " + fileName + ".");
             this.db[fileName] = {
                 hash: hash,
                 path: filePath,
@@ -142,38 +83,74 @@ var UpMarkdown = /** @class */ (function () {
         }
         // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
     };
-    UpMarkdown.prototype.extractLinks = function (file) {
-        var data = fs.readFileSync(file, 'utf8');
-        var re = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
+    UpMarkdown.prototype.extractLinks = function (filePath) {
+        console.log("---Extracting links for file \"" + filePath.substring(filePath.lastIndexOf("/") + 1) + "\".");
+        var data = fs.readFileSync(filePath, 'utf8');
         var match, matches = {};
-        while ((match = re.exec(data)) !== null) {
-            var fileName = void 0, relativePath = void 0, div = match[1].lastIndexOf("/");
-            fileName = match[1].substring(div + 1);
-            relativePath = match[1].substring(0, div + 1);
-            matches[fileName] = {
-                relativePath: relativePath,
-                locationInFile: match.index,
-                lengthOfLink: match[1].length
-            };
-        }
+        do {
+            match = this._RE.exec(data);
+            if (match !== null) {
+                var fileName = match[2].substring(match[2].lastIndexOf("/") + 1);
+                console.log("link: " + fileName);
+                matches[fileName].path = this.db[fileName].path;
+                matches[fileName].linkInstances.push({
+                    locationInFile: match.index,
+                    lengthOfLink: match[2].length
+                });
+                console.log("---In file \"" + filePath.substring(filePath.lastIndexOf("/") + 1) + "\": Found a link to file \"" + fileName + "\" at index " + match.index + ".");
+            }
+        } while (match);
+        // while ((match = this._RE.exec(data)) !== null) {
+        //   // console.log(this._RE.exec(data));
+        //   // console.log('here');
+        //   // console.log(`Iteration ${iterations++} - RE matches in "${file}": \n  ${match}`);
+        //   const fileName: string = match[2].substring(match[2].lastIndexOf("/") + 1);
+        //   // const relPath: string = match[2];
+        //   console.log(`link: ${fileName}`);
+        //   matches[fileName].path = this.db[fileName].path;
+        //   matches[fileName].linkInstances.push({
+        //     locationInFile: match.index,
+        //     lengthOfLink: match[2].length,
+        //   });
+        //   console.log(`---In file "${filePath.substring(filePath.lastIndexOf("/") + 1)}": Found a link to file "${fileName}" at index ${match.index}.`);
+        // }
         return matches;
     };
     //update references to current file
     UpMarkdown.prototype.updateRefs = function (fileName, filePath) {
+        // loop through db, for any file that has links to this file, update its relative path
+        for (var file in this.db) {
+            for (var link in this.db[file].links) {
+                if (link === fileName) {
+                    var newPath = ''; // resolve based on currentPath and filePath
+                    this.db[file].links[link].path = newPath;
+                    //   this.db[file].links[link] = {
+                    //     absPath: '',
+                    //     relPath: 'dir1/',
+                    //     locationsInFile: [85],
+                    //     lengthOfLink: 5
+                    //   };
+                    // for (let loc in this.db[file].links[link].locationsInFile) {
+                    //   // edit file content with new link
+                    // }
+                }
+            }
+        }
     };
     return UpMarkdown;
 }());
-var uMd = new UpMarkdown(dbSample);
-uMd.scanFiles(__dirname);
-var printLinks = function () {
+exports.UpMarkdown = UpMarkdown;
+var Umd = new UpMarkdown(__dirname);
+Umd.scanFiles(Umd.rootDirectory);
+exports.printLinks = function (db) {
     var links = 0;
     setTimeout(function () {
         console.log('------------------------');
-        for (var file in uMd.db) {
-            links += Object.keys(uMd.db[file].links).length;
-            var fileName = uMd.db[file].path.slice(uMd.db[file].path.lastIndexOf('/') + 1);
+        for (var file in db) {
+            links += Object.keys(db[file].links).length;
+            var fileName = db[file].path.slice(db[file].path.lastIndexOf('/') + 1);
             console.log("----" + fileName + ":");
-            console.log(uMd.db[file].links);
+            console.log(db[file].links);
             //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
             //   if (fileLinks > 0) { links += fileLinks; }
         }
@@ -181,4 +158,7 @@ var printLinks = function () {
         console.log('------------------------');
     }, 100);
 };
-// printLinks();
+// printLinks(uMd.db);
+/* ------------------------ToDoS
+1. Fix logic not picking up all files/links atm
+*/

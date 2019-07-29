@@ -1,5 +1,6 @@
 import * as fs from 'fs';
-import * as crypto from 'crypto';
+import * as p from 'path';
+import * as c from 'crypto';
 
 interface IPaths {
   [filePath: string]: IPath;
@@ -13,9 +14,11 @@ interface IPath {
 
 interface ILink {
   [fileName: string]: {
-    relativePath: string;
-    locationsInFile: number[];
-    lengthOfLink: number;
+    path: string;
+    linkInstances: [{
+      locationInFile: number;
+      lengthOfLink: number;
+    }]
     /* __for live updating__
     outdated: boolean; 
     flip when the referred file is moved, 
@@ -25,30 +28,29 @@ interface ILink {
 }
 
 
-const sampleIPath: IPath = {
-  path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
-  hash: '9366a95710845fef95979a2d2073b577',
-  links: {
-    'file10.md': { relativePath: 'dir1 / ', locationsInFile: [85], lengthOfLink: 14 },
-    'test.png': { relativePath: 'media/', locationsInFile: [116], lengthOfLink: 14 }
-  }
-};
+// const sampleIPath: IPath = {
+//   path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
+//   hash: '9366a95710845fef95979a2d2073b577',
+//   links: {
+//     'file10.md': { absPath: '', relPath: 'dir1 / ', locationsInFile: [85], lengthOfLink: 14 },
+//     'test.png': { absPath: '', relPath: 'media/', locationsInFile: [116], lengthOfLink: 14 }
+//   }
+// };
 
-let dbSample: IPaths = {
-  'file0.md': sampleIPath
-};
+// let dbSample: IPaths = {
+//   'file0.md': sampleIPath
+// };
 
 export class UpMarkdown {
+  _RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
   db: IPaths;
   // set: object;
   rootDirectory: string;
-  reLinks: RegExp;
 
   constructor(dirInput: string, dbInput?: IPaths) {
     this.db = dbInput || {};
     // this.set = new Set();
     this.rootDirectory = dirInput;
-    this.reLinks = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
   }
 
   //scan for fs snapshot initially (and when a file is edited?)
@@ -65,6 +67,7 @@ export class UpMarkdown {
           }
           else if (stats.isFile() && /^.+\.md$/.test(currentFile)) {
             this.SaveOrUpdateFile(files[i], currentFile);
+            // console.log(`fileName: ${files[i]} \nfilePath: ${currentFile}`);
           }
         }
       }
@@ -74,7 +77,7 @@ export class UpMarkdown {
   //save or update the file's data in storage
   SaveOrUpdateFile(fileName: string, filePath: string): void {
     // file exists in db? update : add;
-    const hash = crypto.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
+    const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
     if (typeof this.db[fileName] !== 'undefined') {
       console.log(`2. ${fileName} already exists in storage.`);
       if (this.db[fileName].hash !== hash) {
@@ -109,45 +112,51 @@ export class UpMarkdown {
     // console.log(`2. ${fileName} wasn't modified. Didn't update.`);
   }
 
-  extractLinks(file: string): ILink {
-    const data: string = fs.readFileSync(file, 'utf8');
+  extractLinks(filePath: string): ILink {
+    const data: string = fs.readFileSync(filePath, 'utf8');
     let match, matches: ILink = {};
 
-    let iterations: number = 0;
-    while ((match = this.reLinks.exec(data)) !== null) {
-      console.log(`Iteration ${iterations++} - RE matches in "${file}": \n  ${match}`);
-      // let div: number = match[1].lastIndexOf("/");
-      const fileName: string = match[2].substring(match[2].lastIndexOf("/") + 1);
-      const relativePath: string = match[2];
-      console.log(`fileName: ${fileName}\nrelativePath: ${relativePath}`);
-      if (typeof matches[fileName] !== 'undefined') {
-        matches[fileName] = {
-          relativePath,
-          locationsInFile: [match.index],
-          lengthOfLink: match[2].length,
+    do {
+      match = this._RE.exec(data);
+      if (match !== null) {
+        const fileName: string = match[2].substring(match[2].lastIndexOf("/") + 1);
+        if (typeof this.db[fileName] === 'undefined') { throw new Error('Referred file missing in storage.'); }
+        // const path: string = this.db[fileName].path;
+        const path: string = p.relative(filePath, this.db[fileName].path);
+        const linkInstance: { locationInFile: number, lengthOfLink: number } = {
+          locationInFile: match.index, lengthOfLink: match[2].length
         };
-      } else {
-        if (!(match.index in matches[fileName].locationsInFile)) { matches[fileName].locationsInFile.push(match.index); }
+
+        if (typeof matches[fileName] === 'undefined') {
+          matches[fileName] = {
+            path,
+            linkInstances: [linkInstance]
+          };
+        } else { matches[fileName].linkInstances.push(linkInstance); }
       }
-    }
+    } while (match);
+    for (let m in matches) { console.log(matches[m]); }
     return matches;
   }
 
   //update references to current file
   updateRefs(fileName: string, filePath: string): any {
-
-  }
-
-  updateLinks(): any {
-    // 1. loop through files in db
-    // 2. for every referred link in file, update link based on actual referred file's location
+    // loop through db, for any file that has links to this file, update its relative path
     for (let file in this.db) {
       for (let link in this.db[file].links) {
-        this.db[file].links[link] = {
-          relativePath: 'dir1/',
-          locationsInFile: [85],
-          lengthOfLink: 5
-        };
+        if (link === fileName) {
+          const newPath = ''; // resolve based on currentPath and filePath
+          this.db[file].links[link].path = newPath;
+          //   this.db[file].links[link] = {
+          //     absPath: '',
+          //     relPath: 'dir1/',
+          //     locationsInFile: [85],
+          //     lengthOfLink: 5
+          //   };
+          // for (let loc in this.db[file].links[link].locationsInFile) {
+          //   // edit file content with new link
+          // }
+        }
       }
     }
   }
@@ -166,7 +175,7 @@ export class UpMarkdown {
   // }
 }
 
-const Umd = new UpMarkdown(__dirname, dbSample);
+const Umd = new UpMarkdown(__dirname);
 Umd.scanFiles(Umd.rootDirectory);
 
 export const printLinks = (db: IPaths) => {
@@ -188,6 +197,12 @@ export const printLinks = (db: IPaths) => {
 
 // printLinks(uMd.db);
 
-/* ------------------------ToDoS
+/* ------------------------ToDoS---------------------------
 1. Fix logic not picking up all files/links atm
+
+2. Adding files to db at the same time as extracting links from each file will break since not
+all files have been added while the script is trying to get the absolute path to referred files
+(extractLinks function. lines 106, 123, 125)
+
+3.
 */

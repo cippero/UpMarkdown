@@ -29,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       const Umd = new UMD(vscode.workspace.rootPath || '');
       Umd.scanFiles(Umd.rootDirectory);
-      printLinks(Umd.db);
+      // printLinks(Umd.db);
     })
   ];
 
