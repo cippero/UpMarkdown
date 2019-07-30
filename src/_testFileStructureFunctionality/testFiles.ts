@@ -197,7 +197,7 @@ export class UpMarkdown {
       // }
     }
   }
-}
+
 
   // //watch for file edits
   // watchFiles(): void {
