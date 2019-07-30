@@ -9,12 +9,19 @@ interface IPaths {
 interface IPath {
   path: string;
   hash: string;
-  links: ILink;
+  links: {
+    [fileName: string]: {
+      linkInstances: [{
+        locationInFile: number;
+        lengthOfLink: number;
+      }]
+    }
+  };
 }
 
 interface ILink {
   [fileName: string]: {
-    path: string;
+    // path: string;
     linkInstances: [{
       locationInFile: number;
       lengthOfLink: number;
@@ -119,17 +126,17 @@ export class UpMarkdown {
     do {
       match = this._RE.exec(data);
       if (match !== null) {
-        const fileName: string = match[2].substring(match[2].lastIndexOf("/") + 1);
-        if (typeof this.db[fileName] === 'undefined') { throw new Error('Referred file missing in storage.'); }
+        // console.log(match[2]);
+        const fileName: string = p.basename(match[2]);
         // const path: string = this.db[fileName].path;
-        const path: string = p.relative(filePath, this.db[fileName].path);
+        // const path: string = p.relative(filePath, this.db[fileName].path);
         const linkInstance: { locationInFile: number, lengthOfLink: number } = {
           locationInFile: match.index, lengthOfLink: match[2].length
         };
 
         if (typeof matches[fileName] === 'undefined') {
           matches[fileName] = {
-            path,
+            // path,
             linkInstances: [linkInstance]
           };
         } else { matches[fileName].linkInstances.push(linkInstance); }
@@ -139,27 +146,58 @@ export class UpMarkdown {
     return matches;
   }
 
+  updateLinks(): any {
+    setTimeout(() => {
+      for (let file in this.db) {
+        this.updateRefs(p.basename(this.db[file].path), this.db[file].path);
+      }
+    }, 100);
+    // printLinks(this.db);
+  }
+
+  // interface IPath {
+  //   path: string;
+  //   hash: string;
+  //   links: {
+  //     [fileName: string]: {
+  //       linkInstances: [{
+  //         locationInFile: number;
+  //         lengthOfLink: number;
+  //       }]
+  //     }
+  //   };
+  // }
   //update references to current file
   updateRefs(fileName: string, filePath: string): any {
     // loop through db, for any file that has links to this file, update its relative path
+    // const newLinks = this.extractLinks(filePath);
+
+    // [ToDo: FIX]
     for (let file in this.db) {
-      for (let link in this.db[file].links) {
-        if (link === fileName) {
-          const newPath = ''; // resolve based on currentPath and filePath
-          this.db[file].links[link].path = newPath;
-          //   this.db[file].links[link] = {
-          //     absPath: '',
-          //     relPath: 'dir1/',
-          //     locationsInFile: [85],
-          //     lengthOfLink: 5
-          //   };
-          // for (let loc in this.db[file].links[link].locationsInFile) {
-          //   // edit file content with new link
-          // }
-        }
+      if (fileName in this.db[file].links) {
+        console.log(fileName);
+        console.log(this.db[file].links[fileName]);
       }
+      // for (let link in this.db[file].links) {
+      //   console.log(link, fileName);
+      //   if (link === fileName) {
+      //     // const {i, l} = this.db[file].links[link];
+      //     console.log(this.db[file].links[link]);
+      // const newPath = ''; // resolve based on currentPath and filePath
+      // this.db[file].links[link].path = newPath;
+      //   this.db[file].links[link] = {
+      //     absPath: '',
+      //     relPath: 'dir1/',
+      //     locationsInFile: [85],
+      //     lengthOfLink: 5
+      //   };
+      // for (let loc in this.db[file].links[link].locationsInFile) {
+      //   // edit file content with new link
+      // }
+      // }
     }
   }
+}
 
   // //watch for file edits
   // watchFiles(): void {
@@ -184,7 +222,7 @@ export const printLinks = (db: IPaths) => {
     console.log('------------------------');
     for (let file in db) {
       links += Object.keys(db[file].links).length;
-      let fileName: string = db[file].path.slice(db[file].path.lastIndexOf('/') + 1);
+      let fileName: string = p.basename(db[file].path);
       console.log(`----${fileName}:`);
       console.log(db[file].links);
       //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
@@ -196,13 +234,3 @@ export const printLinks = (db: IPaths) => {
 };
 
 // printLinks(uMd.db);
-
-/* ------------------------ToDoS---------------------------
-1. Fix logic not picking up all files/links atm
-
-2. Adding files to db at the same time as extracting links from each file will break since not
-all files have been added while the script is trying to get the absolute path to referred files
-(extractLinks function. lines 106, 123, 125)
-
-3.
-*/
