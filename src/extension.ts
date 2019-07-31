@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UpMarkdown as UMD, printLinks } from './_testFileStructureFunctionality/testFiles';
+import { UpMarkdown as UMD } from './UpMarkdown';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -28,9 +28,9 @@ export function activate(context: vscode.ExtensionContext) {
       // console.log(`     __dirname: ${__dirname} \nWorkspace path: ${vscode.workspace.rootPath} \nWorkspace name: ${vscode.workspace.name}`);
 
       const Umd = new UMD(vscode.workspace.rootPath || '');
-      Umd.scanFiles(Umd.rootDirectory);
-      Umd.updateLinks();
-      // printLinks(Umd.db);
+      Umd.scanFiles();
+      setTimeout(() => { Umd.updateLinks(); }, 100);
+      // Umd.testLoop(20);
     })
   ];
 
