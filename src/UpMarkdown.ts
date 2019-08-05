@@ -51,7 +51,7 @@ interface ILink {
 export class UpMarkdown {
   private _DIR: string;
   private _RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
-  // private instances: number = 0;
+  private _changes: string = '';
   db: IPaths;
 
   constructor(dirInput: string, dbInput?: IPaths) {
@@ -157,18 +157,24 @@ export class UpMarkdown {
 
   //update links to current file
   updateLinks(files: string[] = []): void {
+    let fileChanges: string = '';
     files = files.length > 0 ? files : Object.keys(this.db);
     files.forEach((fileName) => {
       if (!/^.+\.md$/.test(fileName)) { return; }
+      let linkChanges: string = '';
       const fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
       const links: string[] = Object.keys(this.db[fileName].links);
       links.forEach((link) => {
-        const relPath: string = p.relative(this.db[fileName].path.substring(
+        linkChanges = '';
+        const newLinkPath: string = p.relative(this.db[fileName].path.substring(
           0, this.db[fileName].path.length - fileName.length - 1), this.db[link].path);
         // console.log(`relative path from ${fileName} to ${link} is: ${relPath}`);
         const linkInstances = this.db[fileName].links[link].linkInstances;
         linkInstances.forEach((inst) => {
-          console.log(fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink));
+          const oldLinkPath: string = fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink);
+          if (oldLinkPath !== newLinkPath) {
+            linkChanges += `  @${inst.locationInFile}: ${oldLinkPath} --> ${newLinkPath}\n`;
+          }
 
 
           // fs.open('/open/some/file.txt', 'r', (err, fd) => {
@@ -198,16 +204,25 @@ export class UpMarkdown {
 
           // fs.createWriteStream(this.db[fileName].path, 'r+');
         });
+        if (linkChanges !== '') { fileChanges += `File '${fileName}' link to file '${link}':\n` + linkChanges; }
+        console.log(fileChanges);
       });
+      if (fileChanges !== '') { this._changes += fileChanges; }
     });
+    console.log(this._changes);
   }
 
-  testLoop(num: number): void {
-    for (let i = 0; i < num; i++) {
-      console.log(i);
-    }
-  }
-
+  /*
+  [ToDo: fix changelog functionality]:
+each file:
+  - var fileChanges = ''
+  each link:
+    - var linkChanges = '' 
+    each link instance:
+      - not same? linkChanges += change
+    linkChanges not empty? fileChanges += 'file to link' + linkChanges
+fileChanges not empty ? _changes += fileChanges
+  */
 
   updateRefs(fileName: string): any {
     // loop through db, for any file that has links to this file, update its relative path
