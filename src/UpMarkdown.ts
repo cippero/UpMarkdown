@@ -134,7 +134,7 @@ export class UpMarkdown {
   //extract links that refer to other files from current file
   extractLinks(filePath: string): ILink {
     const fileData: string = fs.readFileSync(filePath, 'utf8');
-    let match, matches: ILink = {};
+    let prevInstance: number = -1, match, matches: ILink = {};
 
     do {
       match = this._RE.exec(fileData);
@@ -142,9 +142,10 @@ export class UpMarkdown {
         const fileName: string = p.basename(match[2]);
         // const path: string = p.relative(filePath, this.db[fileName].path);
         const linkInstance: { locationInFile: number, lengthOfLink: number } = {
-          locationInFile: fileData.indexOf(match[2]),
+          locationInFile: fileData.indexOf(match[2], prevInstance + 1),
           lengthOfLink: match[2].length
         };
+        prevInstance = linkInstance.locationInFile;
 
         typeof matches[fileName] === 'undefined'
           ? matches[fileName] = { linkInstances: [linkInstance] }
@@ -159,24 +160,31 @@ export class UpMarkdown {
   updateLinks(files: string[] = []): void {
     let fileChanges: string = '';
     files = files.length > 0 ? files : Object.keys(this.db);
+    // files.forEach((fileName) => { this.printLinks2(fileName); });
     files.forEach((fileName) => {
       if (!/^.+\.md$/.test(fileName)) { return; }
+      // console.log(`processing ${fileName}...`);
+
       let linkChanges: string = '';
       const fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
       const links: string[] = Object.keys(this.db[fileName].links);
+
       links.forEach((link) => {
-        linkChanges = '';
+        // console.log(`processing ${fileName}'s ${link} link...`);
+
         const newLinkPath: string = p.relative(this.db[fileName].path.substring(
           0, this.db[fileName].path.length - fileName.length - 1), this.db[link].path);
         // console.log(`relative path from ${fileName} to ${link} is: ${relPath}`);
         const linkInstances = this.db[fileName].links[link].linkInstances;
+
         linkInstances.forEach((inst) => {
+          // console.log(`processing ${fileName}'s ${link} link instance at location ${inst.locationInFile}`);
           const oldLinkPath: string = fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink);
+
           if (oldLinkPath !== newLinkPath) {
             linkChanges += `  @${inst.locationInFile}: ${oldLinkPath} --> ${newLinkPath}\n`;
+            // console.log(`link has changed, adding to list of linkChanges: \n${linkChanges}`);
           }
-
-
           // fs.open('/open/some/file.txt', 'r', (err, fd) => {
           //   if (err) throw err;
           //   fs.fstat(fd, (err, stat) => {
@@ -204,54 +212,13 @@ export class UpMarkdown {
 
           // fs.createWriteStream(this.db[fileName].path, 'r+');
         });
-        if (linkChanges !== '') { fileChanges += `File '${fileName}' link to file '${link}':\n` + linkChanges; }
-        console.log(fileChanges);
+        if (linkChanges !== '') { fileChanges += `File '${fileName}' link to file '${link}':\n` + linkChanges; linkChanges = ''; }
+        // console.log(`fileChanges: \n${fileChanges}`);
       });
-      if (fileChanges !== '') { this._changes += fileChanges; }
+      if (fileChanges !== '') { this._changes += fileChanges; fileChanges = ''; }
     });
     console.log(this._changes);
   }
-
-  /*
-  [ToDo: fix changelog functionality]:
-each file:
-  - var fileChanges = ''
-  each link:
-    - var linkChanges = '' 
-    each link instance:
-      - not same? linkChanges += change
-    linkChanges not empty? fileChanges += 'file to link' + linkChanges
-fileChanges not empty ? _changes += fileChanges
-  */
-
-  updateRefs(fileName: string): any {
-    // loop through db, for any file that has links to this file, update its relative path
-
-    // if (fileName in this.db[file].links) {
-    console.log(`------------${fileName}---------------`);
-    console.log(this.db[fileName].links);
-    console.log('-----------------------------------------------');
-    // }
-    // for (let link in this.db[file].links) {
-    //   console.log(link, fileName);
-    //   if (link === fileName) {
-    //     // const {i, l} = this.db[file].links[link];
-    //     console.log(this.db[file].links[link]);
-    // const newPath = ''; // resolve based on currentPath and filePath
-    // this.db[file].links[link].path = newPath;
-    //   this.db[file].links[link] = {
-    //     absPath: '',
-    //     relPath: 'dir1/',
-    //     locationsInFile: [85],
-    //     lengthOfLink: 5
-    //   };
-    // for (let loc in this.db[file].links[link].locationsInFile) {
-    //   // edit file content with new link
-    // }
-    // }
-    // }
-  }
-
 
   // //watch for file edits
   // watchFiles(): void {
@@ -281,6 +248,12 @@ fileChanges not empty ? _changes += fileChanges
       console.log(`${links} links found`);
       console.log('------------------------');
     }, 100);
+  }
+
+  printLinks2(fileName: string): void {
+    console.log(`------------${fileName}---------------`);
+    console.log(this.db[fileName].links);
+    console.log('-----------------------------------------------');
   }
 }
 

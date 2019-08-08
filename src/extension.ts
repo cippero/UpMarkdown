@@ -30,7 +30,6 @@ export function activate(context: vscode.ExtensionContext) {
       const Umd = new UMD(vscode.workspace.rootPath || '');
       Umd.scanFiles();
       setTimeout(() => { Umd.updateLinks(); }, 100);
-      // Umd.testLoop(20);
     })
   ];
 
