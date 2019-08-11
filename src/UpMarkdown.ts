@@ -10,6 +10,7 @@ interface IPaths {
     links: {
       [fileName: string]: {
         linkInstances: [{
+          newLinkPath: string;
           oldLinkPath: string;
           locationInFile: number;
           lengthOfLink: number;
@@ -60,13 +61,6 @@ interface IPaths {
 // let dbSample: IPaths = {
 //   'file0.md': sampleIPath
 // };
-
-interface IFileChanges {
-  oldLinkPath: string;
-  locationInFile: number;
-  lengthOfLink: number;
-  newLinkPath: string;
-}
 
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
@@ -156,6 +150,7 @@ export class UpMarkdown {
         const fileName: string = p.basename(match[2]);
         // const path: string = p.relative(filePath, this.db[fileName].path);
         const linkInstance: IPaths['filePath']['links']['fileName']['linkInstances'][0] = {
+          newLinkPath: '',
           oldLinkPath: match[2],
           locationInFile: fileData.indexOf(match[2], prevInstance + 1),
           lengthOfLink: match[2].length
@@ -173,7 +168,7 @@ export class UpMarkdown {
 
   //update links to current file
   findOutdatedLinks(files: string[] = []): void {
-    let fileChangeLog: string = '', fileChanges: IFileChanges[] = [];
+    let fileChangeLog: string = '', fileChanges: [string, number][] = [];
     files = files.length > 0 ? files : Object.keys(this.db);
     // files.forEach((fileName) => { this.printLinks2(fileName); });
     files.forEach((fileName) => {
@@ -191,17 +186,15 @@ export class UpMarkdown {
         // console.log(`relative path from ${fileName} to ${link} is: ${relPath}`);
         const linkInstances = this.db[fileName].links[link].linkInstances;
 
-        linkInstances.forEach((inst) => {
+        linkInstances.forEach((inst, i) => {
           // console.log(`processing ${fileName}'s ${link} link instance at location ${inst.locationInFile}`);
           // const oldLinkPath: string = fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink);
 
           if (inst.oldLinkPath !== newLinkPath) {
+            this.db[fileName].links[link].linkInstances[i].newLinkPath = newLinkPath;
+            fileChanges.push([link, i]);
+
             linkChanges += `  @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${newLinkPath}'\n`;
-            fileChanges.push({
-              ...inst,
-              newLinkPath
-              // offset: oldLinkPath.length - newLinkPath.length
-            });
             // console.log(`link has changed, adding to list of linkChanges: \n${linkChanges}`);
           }
 
@@ -213,7 +206,11 @@ export class UpMarkdown {
       //
       //
       //
-      // [ToDo: separate this part of the function and merge fileChangeLog & fileChanges in functionality, atm redundant]
+      // [ToDo: 
+      //  - merge fileChangeLog & fileChanges in functionality, atm redundant
+      //  - output to log at same operation as editting the link, 
+      //    to avoid log saying one thing but in actuality getting a different result
+      // ]
       //
       //
       //
@@ -227,7 +224,7 @@ export class UpMarkdown {
     this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
   }
 
-  updateLinks = (fileName: string, fileChanges: IFileChanges[]): void => {
+  updateLinks = (fileName: string, fileChanges: [string, number][]): void => {
     const throwError = (op: string, err: NodeJS.ErrnoException) => {
       throw console.error(`Error ${op} ${fileName}: \n${err}`);
     };
@@ -239,9 +236,10 @@ export class UpMarkdown {
 
       let offset: number = 0;
       fileChanges.forEach(linkInstance => {
-        fileData = [fileData.slice(0, linkInstance.locationInFile + offset), linkInstance.newLinkPath,
-        fileData.slice(linkInstance.locationInFile + offset + linkInstance.oldLinkPath.length)].join('');
-        offset += linkInstance.newLinkPath.length - linkInstance.oldLinkPath.length;
+        const inst = this.db[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
+        fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
+        fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
+        offset += inst.newLinkPath.length - inst.oldLinkPath.length;
       });
 
       fs.writeFile(this.db[fileName].path, fileData, (err) => {
@@ -254,6 +252,13 @@ export class UpMarkdown {
       });
     });
   }
+
+  /*
+  forEach linkInstance, need:
+  locationInFile
+  newLinkPath
+  oldLinkPath.length === lengthOfLink
+  */
 
   // //watch for file edits
   // watchFiles(): void {
