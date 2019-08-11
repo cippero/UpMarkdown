@@ -69,14 +69,14 @@ interface IFileChanges {
 }
 
 export class UpMarkdown {
-  private readonly DIR: string;
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
+  private readonly DIR: string;
   private changeLog: string = '';
   db: IPaths;
 
   constructor(dirInput: string, dbInput?: IPaths) {
-    this.db = dbInput || {};
     this.DIR = dirInput;
+    this.db = dbInput || {};
   }
 
   //scan to store file structure snapshot in storage
