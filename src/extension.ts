@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
       // console.log('root path:', vscode.workspace.rootPath);
       const uMd = new UMD(vscode.workspace.rootPath || '');
       uMd.scanFiles();
-      setTimeout(() => { uMd.updateLinks(); }, 100);
+      setTimeout(() => { uMd.findOutdatedLinks(); }, 100);
     })
   ];
 

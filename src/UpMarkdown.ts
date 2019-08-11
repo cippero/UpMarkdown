@@ -61,6 +61,13 @@ interface IPaths {
 //   'file0.md': sampleIPath
 // };
 
+interface IFileChanges {
+  oldLinkPath: string;
+  locationInFile: number;
+  lengthOfLink: number;
+  newLinkPath: string;
+}
+
 export class UpMarkdown {
   private readonly DIR: string;
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
@@ -165,18 +172,15 @@ export class UpMarkdown {
   }
 
   //update links to current file
-  updateLinks(files: string[] = []): void {
-    let fileChangeLog: string = '',
-      fileChanges: { oldLinkPath: string, locationInFile: number, lengthOfLink: number, newLinkPath: string }[] = [];
+  findOutdatedLinks(files: string[] = []): void {
+    let fileChangeLog: string = '', fileChanges: IFileChanges[] = [];
     files = files.length > 0 ? files : Object.keys(this.db);
     // files.forEach((fileName) => { this.printLinks2(fileName); });
     files.forEach((fileName) => {
-      if (fileName !== 'yay.md') { return; }
       if (!/^.+\.md$/.test(fileName)) { return; }
       // console.log(`processing ${fileName}...`);
 
       let linkChanges: string = '';
-      let fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
       const links: string[] = Object.keys(this.db[fileName].links);
 
       links.forEach((link) => {
@@ -192,7 +196,7 @@ export class UpMarkdown {
           // const oldLinkPath: string = fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink);
 
           if (inst.oldLinkPath !== newLinkPath) {
-            linkChanges += `  @${inst.locationInFile}: ${inst.oldLinkPath} --> ${newLinkPath}\n`;
+            linkChanges += `  @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${newLinkPath}'\n`;
             fileChanges.push({
               ...inst,
               newLinkPath
@@ -205,41 +209,50 @@ export class UpMarkdown {
         if (linkChanges !== '') { fileChangeLog += `File '${fileName}' link to file '${link}':\n` + linkChanges; linkChanges = ''; }
         // console.log(`fileChangeLog: \n${fileChangeLog}`);
       });
-
+      //
+      //
+      //
+      //
+      // [ToDo: separate this part of the function and merge fileChangeLog & fileChanges in functionality, atm redundant]
+      //
+      //
+      //
+      //
       if (fileChangeLog !== '') {
         this.changeLog += fileChangeLog;
         fileChangeLog = '';
-
-        const throwError = (op: string, err: NodeJS.ErrnoException) => {
-          throw console.error(`Error ${op} ${fileName}: \n${err}`);
-        };
-
-        fs.open(this.db[fileName].path, 'r+', (err, fd) => {
-          if (err) { throwError('opening', err); }
-
-          console.log(fileData);
-          console.log(Object.keys(fileChanges).length + ' links to update.');
-          let offset: number = 0;
-          fileChanges.forEach(linkInstance => {
-            fileData = [fileData.slice(0, linkInstance.locationInFile + offset), linkInstance.newLinkPath,
-            fileData.slice(linkInstance.locationInFile + offset + linkInstance.oldLinkPath.length)].join('');
-            offset += linkInstance.newLinkPath.length - linkInstance.oldLinkPath.length;
-          });
-          console.log(fileData);
-
-          fs.writeFile(this.db[fileName].path, fileData, (err) => {
-            if (err) { throwError('writing to', err); }
-          });
-
-          fs.close(fd, (err) => {
-            if (err) { throwError('closing', err); }
-            console.log(`Wrote to file ${fileName} successfully.`);
-          });
-        });
-
+        this.updateLinks(fileName, fileChanges);
       }
     });
-    console.log(this.changeLog);
+    this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
+  }
+
+  updateLinks = (fileName: string, fileChanges: IFileChanges[]): void => {
+    const throwError = (op: string, err: NodeJS.ErrnoException) => {
+      throw console.error(`Error ${op} ${fileName}: \n${err}`);
+    };
+
+    let fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
+
+    fs.open(this.db[fileName].path, 'r+', (err, fd) => {
+      if (err) { throwError('opening', err); }
+
+      let offset: number = 0;
+      fileChanges.forEach(linkInstance => {
+        fileData = [fileData.slice(0, linkInstance.locationInFile + offset), linkInstance.newLinkPath,
+        fileData.slice(linkInstance.locationInFile + offset + linkInstance.oldLinkPath.length)].join('');
+        offset += linkInstance.newLinkPath.length - linkInstance.oldLinkPath.length;
+      });
+
+      fs.writeFile(this.db[fileName].path, fileData, (err) => {
+        if (err) { throwError('writing to', err); }
+      });
+
+      fs.close(fd, (err) => {
+        if (err) { throwError('closing', err); }
+        console.log(`Wrote to file ${fileName} successfully.`);
+      });
+    });
   }
 
   // //watch for file edits
