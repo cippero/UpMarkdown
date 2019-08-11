@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
   const disposable = [
-    vscode.commands.registerCommand('extension.helloWorld', () => {
+    vscode.commands.registerCommand('extension.helloWorld', _ => {
       // const folderName = path.dirname(e.path);
       // const folderUrl = vscode.Uri.file(folderName);
 
@@ -23,13 +23,14 @@ export function activate(context: vscode.ExtensionContext) {
       const val: string = context.globalState.get("test", "defaultValue");
       vscode.window.showInformationMessage(val);
     }),
-    vscode.commands.registerCommand('extension.updateLinks', () => {
+    vscode.commands.registerCommand('extension.updateLinks', _ => {
       // const dir: string = __dirname.slice(0, __dirname.lastIndexOf('/')) + '/src/_testFileStructureFunctionality';
       // console.log(`     __dirname: ${__dirname} \nWorkspace path: ${vscode.workspace.rootPath} \nWorkspace name: ${vscode.workspace.name}`);
 
-      const Umd = new UMD(vscode.workspace.rootPath || '');
-      Umd.scanFiles();
-      setTimeout(() => { Umd.updateLinks(); }, 100);
+      // console.log('root path:', vscode.workspace.rootPath);
+      const uMd = new UMD(vscode.workspace.rootPath || '');
+      uMd.scanFiles();
+      setTimeout(() => { uMd.findOutdatedLinks(); }, 100);
     })
   ];
 
