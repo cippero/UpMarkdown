@@ -10,62 +10,14 @@ interface IPaths {
     links: {
       [fileName: string]: {
         linkInstances: [{
+          newLinkPath: string;
           oldLinkPath: string;
           locationInFile: number;
           lengthOfLink: number;
-        }]
-      }
+        }];
+      };
     };
   };
-}
-
-// interface IPath {
-//   path: string;
-//   // hash: string;
-//   links: {
-//     [fileName: string]: {
-//       linkInstances: [{
-//         locationInFile: number;
-//         lengthOfLink: number;
-//       }]
-//     }
-//   };
-// }
-
-// interface ILink {
-//   [fileName: string]: {
-//     // path: string;
-//     linkInstances: [{
-//       locationInFile: number;
-//       lengthOfLink: number;
-//     }]
-//     /* __for live updating__
-//     outdated: boolean; 
-//     flip when the referred file is moved, 
-//     which marks that the link to this file
-//     should be updated in the referring file */
-//   };
-// }
-
-
-// const sampleIPath: IPath = {
-//   path: '/home/gilwein/code/temp/upmarkdown/src/_testFileStructureFunctionality/file0.md',
-//   hash: '9366a95710845fef95979a2d2073b577',
-//   links: {
-//     'file10.md': { absPath: '', relPath: 'dir1 / ', locationsInFile: [85], lengthOfLink: 14 },
-//     'test.png': { absPath: '', relPath: 'media/', locationsInFile: [116], lengthOfLink: 14 }
-//   }
-// };
-
-// let dbSample: IPaths = {
-//   'file0.md': sampleIPath
-// };
-
-interface IFileChanges {
-  oldLinkPath: string;
-  locationInFile: number;
-  lengthOfLink: number;
-  newLinkPath: string;
 }
 
 export class UpMarkdown {
@@ -86,16 +38,12 @@ export class UpMarkdown {
       if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
       files.forEach((fileName) => {
         const filePath = directory + '/' + fileName;
-        // console.log(vscode.files
         if (fs.existsSync(filePath)) {
           const stats = fs.lstatSync(filePath);
           if (stats.isDirectory()) { this.scanFiles(filePath); }
           else if (stats.isFile()) {
-            // this.instances++;
             this.saveFile(fileName, filePath);
-            // this.instances--;
           }
-          // this.updateLinks();
         }
       });
     });
@@ -154,8 +102,8 @@ export class UpMarkdown {
       match = UpMarkdown.RE.exec(fileData);
       if (match !== null) {
         const fileName: string = p.basename(match[2]);
-        // const path: string = p.relative(filePath, this.db[fileName].path);
         const linkInstance: IPaths['filePath']['links']['fileName']['linkInstances'][0] = {
+          newLinkPath: '',
           oldLinkPath: match[2],
           locationInFile: fileData.indexOf(match[2], prevInstance + 1),
           lengthOfLink: match[2].length
@@ -171,65 +119,42 @@ export class UpMarkdown {
     return matches;
   }
 
-  //update links to current file
+  //find outdated links to all files or specified files
   findOutdatedLinks(files: string[] = []): void {
-    let fileChangeLog: string = '', fileChanges: IFileChanges[] = [];
+    let fileChanges: [string, number][] = [];
     files = files.length > 0 ? files : Object.keys(this.db);
-    // files.forEach((fileName) => { this.printLinks2(fileName); });
     files.forEach((fileName) => {
       if (!/^.+\.md$/.test(fileName)) { return; }
-      // console.log(`processing ${fileName}...`);
-
-      let linkChanges: string = '';
       const links: string[] = Object.keys(this.db[fileName].links);
 
       links.forEach((link) => {
-        // console.log(`processing ${fileName}'s ${link} link...`);
-
         const newLinkPath: string = p.relative(this.db[fileName].path.substring(
           0, this.db[fileName].path.length - fileName.length - 1), this.db[link].path);
-        // console.log(`relative path from ${fileName} to ${link} is: ${relPath}`);
         const linkInstances = this.db[fileName].links[link].linkInstances;
 
-        linkInstances.forEach((inst) => {
-          // console.log(`processing ${fileName}'s ${link} link instance at location ${inst.locationInFile}`);
-          // const oldLinkPath: string = fileData.slice(inst.locationInFile, inst.locationInFile + inst.lengthOfLink);
-
+        linkInstances.forEach((inst, i) => {
           if (inst.oldLinkPath !== newLinkPath) {
-            linkChanges += `  @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${newLinkPath}'\n`;
-            fileChanges.push({
-              ...inst,
-              newLinkPath
-              // offset: oldLinkPath.length - newLinkPath.length
-            });
-            // console.log(`link has changed, adding to list of linkChanges: \n${linkChanges}`);
+            this.db[fileName].links[link].linkInstances[i].newLinkPath = newLinkPath;
+            fileChanges.push([link, i]);
           }
-
         });
-        if (linkChanges !== '') { fileChangeLog += `File '${fileName}' link to file '${link}':\n` + linkChanges; linkChanges = ''; }
-        // console.log(`fileChangeLog: \n${fileChangeLog}`);
       });
-      //
-      //
-      //
-      //
-      // [ToDo: separate this part of the function and merge fileChangeLog & fileChanges in functionality, atm redundant]
-      //
-      //
-      //
-      //
-      if (fileChangeLog !== '') {
-        this.changeLog += fileChangeLog;
-        fileChangeLog = '';
-        this.updateLinks(fileName, fileChanges);
-      }
+      this.updateLinks(fileName, fileChanges);
+      fileChanges = [];
     });
-    this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
+    setTimeout(_ => {
+      this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
+      this.changeLog = '';
+    }, 1000);
   }
 
-  updateLinks = (fileName: string, fileChanges: IFileChanges[]): void => {
-    const throwError = (op: string, err: NodeJS.ErrnoException) => {
-      throw console.error(`Error ${op} ${fileName}: \n${err}`);
+  //update links to current file
+  updateLinks(fileName: string, fileChanges: [string, number][]) {
+    if (fileChanges.length === 0) { return; }
+    let changeLog: string = `'${fileName}' link changes:\n`;
+
+    const throwError = (operation: string, err: NodeJS.ErrnoException) => {
+      throw console.error(`Error ${operation} ${fileName}: \n${err}`);
     };
 
     let fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
@@ -238,20 +163,23 @@ export class UpMarkdown {
       if (err) { throwError('opening', err); }
 
       let offset: number = 0;
+
       fileChanges.forEach(linkInstance => {
-        fileData = [fileData.slice(0, linkInstance.locationInFile + offset), linkInstance.newLinkPath,
-        fileData.slice(linkInstance.locationInFile + offset + linkInstance.oldLinkPath.length)].join('');
-        offset += linkInstance.newLinkPath.length - linkInstance.oldLinkPath.length;
+        const inst = this.db[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
+
+        fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
+        fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
+
+        offset += inst.newLinkPath.length - inst.oldLinkPath.length;
+
+        changeLog += `  '${linkInstance[0]}' @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
       });
 
-      fs.writeFile(this.db[fileName].path, fileData, (err) => {
-        if (err) { throwError('writing to', err); }
-      });
+      fs.writeFile(this.db[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
 
-      fs.close(fd, (err) => {
-        if (err) { throwError('closing', err); }
-        console.log(`Wrote to file ${fileName} successfully.`);
-      });
+      fs.close(fd, (err) => { if (err) { throwError('closing', err); } });
+
+      this.changeLog += changeLog;
     });
   }
 
@@ -268,30 +196,9 @@ export class UpMarkdown {
   //   });
   // }
 
-  printLinks = (): void => {
-    let links: number = 0;
-    setTimeout(() => {
-      console.log('------------------------');
-      for (let file in this.db) {
-        links += Object.keys(this.db[file].links).length;
-        let fileName: string = p.basename(this.db[file].path);
-        console.log(`----${fileName}:`);
-        console.log(this.db[file].links);
-        //   const fileLinks: number = Object.keys(uMd.db[file].links).length;
-        //   if (fileLinks > 0) { links += fileLinks; }
-      }
-      console.log(`${links} links found`);
-      console.log('------------------------');
-    }, 100);
-  }
-
-  printLinks2(fileName: string): void {
+  printLinks(fileName: string): void {
     console.log(`------------${fileName}---------------`);
     console.log(this.db[fileName].links);
     console.log('-----------------------------------------------');
   }
 }
-
-// const Umd = new UpMarkdown(__dirname);
-// Umd.scanFiles(Umd.rootDirectory);
-
