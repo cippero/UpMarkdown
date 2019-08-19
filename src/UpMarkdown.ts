@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 interface IPaths {
   [filePath: string]: {
     path: string;
+    // directory: string;
     // hash: string;
     links: {
       [fileName: string]: {
@@ -21,13 +22,13 @@ interface IPaths {
 }
 
 export class UpMarkdown {
-  private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s]+)/, 'g');
+  private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
   private readonly DIR: string;
   private changeLog: string = '';
   db: IPaths;
-  blacklist: { [filePath: string]: number };
+  blacklist: { [filePath: string]: null };
 
-  constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { string: number }) {
+  constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { [filePath: string]: null }) {
     this.DIR = dirInput;
     this.db = dbInput || {};
     this.blacklist = blacklistInput || {};
@@ -41,12 +42,15 @@ export class UpMarkdown {
       if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
       files.forEach((fileName) => {
         const filePath = directory + '/' + fileName;
-        if (fs.existsSync(filePath) && typeof this.blacklist[filePath] === 'undefined') {
+
+        if (fs.existsSync(filePath) && typeof this.blacklist[fileName] === 'undefined') {
           const stats = fs.lstatSync(filePath);
           if (stats.isDirectory()) { this.scanFiles(filePath); }
           else if (stats.isFile()) {
             this.saveFile(fileName, filePath);
           }
+        } else {
+          console.log(`'${fileName}' in blacklist, skipping.`);
         }
       });
     });
@@ -55,14 +59,18 @@ export class UpMarkdown {
   //save the file's data in storage
   saveFile(fileName: string, filePath: string): void {
     if (typeof this.db[fileName] !== 'undefined') {
-      console.log(`File already exists in storage: ${fileName}`);
+      // if (this.db[fileName].directory === directory) {
+      return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
+      // console.log(` - Current directory: ${directory}`);
       // this.updateFile(fileName, filePath);
+      // }
     }
     // console.log('**************************');
     // console.log(`2. Adding ${fileName}.`);
     this.db[fileName] = {
       // hash,
       path: filePath,
+      // directory,
       links: /^.+\.md$/.test(fileName) ? this.extractLinks(filePath) : {}
     };
     // console.log(`2. Added ${fileName}.`);
@@ -131,8 +139,12 @@ export class UpMarkdown {
       const links: string[] = Object.keys(this.db[fileName].links);
 
       links.forEach((link) => {
+        if (typeof this.db[link] === 'undefined') {
+          return console.error(`'${fileName}': Skipping the link to '${link}': a file with that name doesn't exist in storage.`);
+        }
         const newLinkPath: string = p.relative(this.db[fileName].path.substring(
           0, this.db[fileName].path.length - fileName.length - 1), this.db[link].path);
+        // console.log(newLinkPath);
         const linkInstances = this.db[fileName].links[link].linkInstances;
 
         linkInstances.forEach((inst, i) => {
@@ -154,7 +166,7 @@ export class UpMarkdown {
   //update links to current file
   updateLinks(fileName: string, fileChanges: [string, number][]) {
     if (fileChanges.length === 0) { return; }
-    let changeLog: string = `'${fileName}' link changes:\n`;
+    let changeLog: string = `- File '${fileName}' link changes:\n`;
 
     const throwError = (operation: string, err: NodeJS.ErrnoException) => {
       throw console.error(`Error ${operation} ${fileName}: \n${err}`);
@@ -170,15 +182,15 @@ export class UpMarkdown {
       fileChanges.forEach(linkInstance => {
         const inst = this.db[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
 
-        // fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
-        // fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
+        fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
+        fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
 
-        // offset += inst.newLinkPath.length - inst.oldLinkPath.length;
+        offset += inst.newLinkPath.length - inst.oldLinkPath.length;
 
-        changeLog += `  '${linkInstance[0]}' @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
+        changeLog += `  Link to '${linkInstance[0]}' @${inst.locationInFile}:\n    '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
       });
 
-      fs.writeFile(this.db[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
+      // fs.writeFile(this.db[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
 
       fs.close(fd, (err) => { if (err) { throwError('closing', err); } });
 
@@ -199,10 +211,12 @@ export class UpMarkdown {
   //   });
   // }
 
-  printLinks(fileName: string): void {
-    console.log(`------------${fileName}---------------`);
-    console.log(this.db[fileName].links);
-    console.log('-----------------------------------------------');
+  printLinks(): void {
+    Object.keys(this.db).forEach(fileName => {
+      console.log(`------------${fileName}---------------`);
+      console.log(this.db[fileName].links);
+      console.log('-----------------------------------------------');
+    });
   }
 }
 
@@ -211,6 +225,5 @@ export class UpMarkdown {
 2. VScode API: Blacklist context option in file explorer.
 3. VScode API: FS watcher for file rename/moved/deleted/edited(?).
 4. Replace placeholder SetTimeout occurrences with logical code.
-5. Refactor code to use filePath instead of fileName as the object key to
-avoid clashes when two files in different locations have the same name.
+5. Fix bug: all files must have unique names.
 */
