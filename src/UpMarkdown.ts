@@ -25,20 +25,23 @@ export class UpMarkdown {
   private readonly DIR: string;
   private changeLog: string = '';
   db: IPaths;
+  blacklist: { [filePath: string]: number };
 
-  constructor(dirInput: string, dbInput?: IPaths) {
+  constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { string: number }) {
     this.DIR = dirInput;
     this.db = dbInput || {};
+    this.blacklist = blacklistInput || {};
   }
 
   //scan to store file structure snapshot in storage
   scanFiles(directory: string = this.DIR): void {
     if (directory === '') { throw console.error('No input directory specified.'); }
+    if (typeof this.blacklist[directory] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
     fs.readdir(directory, (err, files): void => {
       if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
       files.forEach((fileName) => {
         const filePath = directory + '/' + fileName;
-        if (fs.existsSync(filePath)) {
+        if (fs.existsSync(filePath) && typeof this.blacklist[filePath] === 'undefined') {
           const stats = fs.lstatSync(filePath);
           if (stats.isDirectory()) { this.scanFiles(filePath); }
           else if (stats.isFile()) {
@@ -52,7 +55,7 @@ export class UpMarkdown {
   //save the file's data in storage
   saveFile(fileName: string, filePath: string): void {
     if (typeof this.db[fileName] !== 'undefined') {
-      console.error('File already exists in storage.');
+      console.log(`File already exists in storage: ${fileName}`);
       // this.updateFile(fileName, filePath);
     }
     // console.log('**************************');
@@ -167,10 +170,10 @@ export class UpMarkdown {
       fileChanges.forEach(linkInstance => {
         const inst = this.db[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
 
-        fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
-        fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
+        // fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
+        // fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
 
-        offset += inst.newLinkPath.length - inst.oldLinkPath.length;
+        // offset += inst.newLinkPath.length - inst.oldLinkPath.length;
 
         changeLog += `  '${linkInstance[0]}' @${inst.locationInFile}: '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
       });
@@ -202,3 +205,12 @@ export class UpMarkdown {
     console.log('-----------------------------------------------');
   }
 }
+
+/* [ToDo:]
+1. VScode API: Persistent storage.
+2. VScode API: Blacklist context option in file explorer.
+3. VScode API: FS watcher for file rename/moved/deleted/edited(?).
+4. Replace placeholder SetTimeout occurrences with logical code.
+5. Refactor code to use filePath instead of fileName as the object key to
+avoid clashes when two files in different locations have the same name.
+*/
