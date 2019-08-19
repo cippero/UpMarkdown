@@ -5,3 +5,4 @@ node_modules
 .gitignore
 .vscodeignore
 vsc-extension-quickstart.md
+azure-iot-mobility-services
