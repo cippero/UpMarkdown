@@ -10,29 +10,42 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:extension.helloWorld",
-    "onCommand:extension.updateLinks"
+    "onCommand:extension.updateLinks",
+    "onCommand:extension.toggleBlacklist"
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "extension.helloWorld",
-        "title": "Hello World"
+    "commands": [{
+        "command": "extension.updateLinks",
+        "title": "Update Markdown Links"
       },
       {
-        "command": "extension.updateLinks",
-        "title": "Update Links"
+        "command": "extension.toggleBlacklist",
+        "title": "Add"
       }
     ],
     "menus": {
-      "explorer/context": [
-        {
+      "explorer/context": [{
           "when": "explorerResourceIsFolder",
           "command": "extension.updateLinks",
-          "group": "navigation"
+          "group": "1_modification@1"
+        },
+        {
+          "command": "extension.toggleBlacklist",
+          "group": "1_modification@2"
         }
       ]
+    },
+    "configuration": {
+      "title": "UpMarkdown",
+      "properties": {
+        "upMarkdown.blacklist": {
+          "type": "array",
+          "default": ["archive"],
+          "scope": "window",
+          "description": "Specifies which files and folders should be ignored."
+        }
+      }
     }
   },
   "scripts": {

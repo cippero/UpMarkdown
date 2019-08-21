@@ -37,20 +37,21 @@ export class UpMarkdown {
   //scan to store file structure snapshot in storage
   scanFiles(directory: string = this.DIR): void {
     if (directory === '') { throw console.error('No input directory specified.'); }
-    if (typeof this.blacklist[directory] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
+    // if (typeof this.blacklist[directory] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
     fs.readdir(directory, (err, files): void => {
       if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
       files.forEach((fileName) => {
         const filePath = directory + '/' + fileName;
 
-        if (fs.existsSync(filePath) && typeof this.blacklist[fileName] === 'undefined') {
-          const stats = fs.lstatSync(filePath);
-          if (stats.isDirectory()) { this.scanFiles(filePath); }
-          else if (stats.isFile()) {
-            this.saveFile(fileName, filePath);
+        if (fs.existsSync(filePath)) {
+          if (typeof this.blacklist[fileName] !== 'undefined') {
+            console.log(`'${fileName}' in blacklist, skipping.`);
+          } else {
+            const stats = fs.lstatSync(filePath);
+            if (stats.isDirectory()) { this.scanFiles(filePath); }
+            else if (stats.isFile()) { this.saveFile(fileName, filePath); }
           }
-        } else {
-          console.log(`'${fileName}' in blacklist, skipping.`);
+
         }
       });
     });
@@ -221,9 +222,16 @@ export class UpMarkdown {
 }
 
 /* [ToDo:]
-1. VScode API: Persistent storage.
-2. VScode API: Blacklist context option in file explorer.
-3. VScode API: FS watcher for file rename/moved/deleted/edited(?).
-4. Replace placeholder SetTimeout occurrences with logical code.
-5. Fix bug: all files must have unique names.
+
+_Functionality_
+- VScode API: Persistent storage.
+- VScode API: FS watcher for file rename/moved/deleted/edited(?).
+
+_Bugs_
+- Replace placeholder SetTimeout occurrences with logical code / async/await / promises.
+- Fix bug: all files must have unique names.
+
+_Other_
+- Add UI to blacklist functionality? And then store blacklisted items by path instead of file name.
+
 */
