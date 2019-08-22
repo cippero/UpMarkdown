@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UpMarkdown as UMD } from './UpMarkdown';
+import { UpMarkdown, IPaths } from './UpMarkdown';
 
 export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.commands.registerCommand('extension.toggleBlacklist', _ => {
@@ -9,25 +9,29 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.commands.registerCommand('extension.updateLinks', async ({ path }) => {
     // const folderName = path.dirname(e.path);
     // const folderUrl = vscode.Uri.file(folderName);
+    // vscode.commands.executeCommand('setContext', 'key', 'Remove');
 
-    // context.globalState.update("test", "this is not test");
     // const val: string = context.globalState.get("test", "defaultValue");
+    // context.globalState.update("test", "this is not test");
     // vscode.window.showInformationMessage(val);
+    // console.log(vscode.workspace.rootPath);
 
-    const { blacklist } = await vscode.workspace.getConfiguration('upMarkdown');
+    let storage: IPaths | undefined = await context.workspaceState.get("umdStorage", undefined);
+    // console.log('----------vscode storage:');
+    // console.log(storage);
+    const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
+    let blacklist: { [file: string]: null } = {};
+    bl.forEach((item: any) => { blacklist[item] = null; });
 
-    let bl: { [file: string]: null } = {};
-    blacklist.forEach((item: any) => { bl[item] = null; });
-    // const blacklistSample: { [filePath: string]: null } = { 'archive': null, 'developers': null, 'pk': null };
+    const uMd = new UpMarkdown(path || '', storage, blacklist);
+    storage = uMd.saveFiles(uMd.getFilePaths());
+    context.workspaceState.update('umdStorage', storage);
+    uMd.findOutdatedLinks();
 
-    const uMd = new UMD(path || vscode.workspace.rootPath, undefined, bl);
-    uMd.scanFiles();
-    // setTimeout(() => { uMd.printLinks(); }, 100);
-    // setTimeout(() => { uMd.findOutdatedLinks(); }, 100);
 
-    // setTimeout(() => {
-    //   vscode.commands.executeCommand('setContext', 'key', 'Remove');
-    // }, 5000);
+    // storage = context.workspaceState.get("umdStorage", undefined);
+    // console.log('----------vscode storage:');
+    // console.log(storage);
   }));
 }
 

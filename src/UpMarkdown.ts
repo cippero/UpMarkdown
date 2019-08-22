@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import * as p from 'path';
 import * as vscode from 'vscode';
+const partition = require('lodash.partition');
 // import * as c from 'crypto';
 
-interface IPaths {
+export interface IPaths {
   [filePath: string]: {
     path: string;
     // directory: string;
@@ -34,48 +35,81 @@ export class UpMarkdown {
     this.blacklist = blacklistInput || {};
   }
 
-  //scan to store file structure snapshot in storage
-  scanFiles(directory: string = this.DIR): void {
-    if (directory === '') { throw console.error('No input directory specified.'); }
-    // if (typeof this.blacklist[directory] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
-    fs.readdir(directory, (err, files): void => {
-      if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
-      files.forEach((fileName) => {
-        const filePath = directory + '/' + fileName;
+  // //scan to store file structure snapshot in storage
+  // scanFiles(directory: string = this.DIR): void {
+  //   if (directory === '') { throw console.error('No input directory specified.'); }
+  //   if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
 
-        if (fs.existsSync(filePath)) {
-          if (typeof this.blacklist[fileName] !== 'undefined') {
-            console.log(`'${fileName}' in blacklist, skipping.`);
-          } else {
-            const stats = fs.lstatSync(filePath);
-            if (stats.isDirectory()) { this.scanFiles(filePath); }
-            else if (stats.isFile()) { this.saveFile(fileName, filePath); }
-          }
+  //   fs.readdir(directory, (err, files): void => {
+  //     if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
+  //     files.forEach((fileName) => {
+  //       const filePath = directory + '/' + fileName;
 
-        }
-      });
+  //       if (fs.existsSync(filePath)) {
+  //         if (typeof this.blacklist[fileName] !== 'undefined') {
+  //           console.log(`'${fileName}' in blacklist, skipping.`);
+  //         } else {
+  //           const stats = fs.lstatSync(filePath);
+  //           if (stats.isDirectory()) {
+  //             // pendingRecursive++;
+  //             this.scanFiles(filePath);
+  //           }
+  //           else if (stats.isFile()) { this.saveFile(fileName, filePath); }
+  //         }
+  //       }
+  //     });
+  //   });
+  // }
+
+  //gets a list of all files in the directory
+  getFilePaths(folderPath: string = this.DIR): any {
+    if (folderPath === '') { throw console.error('No input directory specified.'); }
+    if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
+
+    let entryPaths: string[] = [];
+    try {
+      // adds full path to each file name in current directory
+      entryPaths = fs.readdirSync(folderPath).reduce((result: string[], entry: string) => {
+        if (typeof this.blacklist[entry] !== 'undefined') {
+          console.log(`'${entry}' in blacklist, skipping.`);
+        } else { result.push(p.join(folderPath, entry)); }
+        return result;
+      }, []);
+    } catch (err) { throw console.error(`Error reading directory ${folderPath}: \n${err}`); }
+
+    // filters all the full paths and separates into an array of files and an array of directories
+    const [filePaths, dirPaths]: [string[], string[]] = partition(entryPaths, (entryPath: string) => {
+      return fs.statSync(entryPath).isFile();
     });
+
+    // recursively adds files in current directory to files in all other directories
+    const dirFiles: string[] = dirPaths.reduce((prev, curr) => prev.concat(this.getFilePaths(curr)), []);
+    return [...filePaths, ...dirFiles];
   }
 
   //save the file's data in storage
-  saveFile(fileName: string, filePath: string): void {
-    if (typeof this.db[fileName] !== 'undefined') {
-      // if (this.db[fileName].directory === directory) {
-      return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
-      // console.log(` - Current directory: ${directory}`);
-      // this.updateFile(fileName, filePath);
-      // }
-    }
-    // console.log('**************************');
-    // console.log(`2. Adding ${fileName}.`);
-    this.db[fileName] = {
-      // hash,
-      path: filePath,
-      // directory,
-      links: /^.+\.md$/.test(fileName) ? this.extractLinks(filePath) : {}
-    };
-    // console.log(`2. Added ${fileName}.`);
-    // console.log('**************************');
+  saveFiles(files: string[]): IPaths {
+    files.forEach((filePath: string) => {
+      const fileName = p.basename(filePath);
+      if (typeof this.db[fileName] !== 'undefined') {
+        // if (this.db[fileName].directory === directory) {
+        return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
+        // console.log(` - Current directory: ${directory}`);
+        // this.updateFile(fileName, filePath);
+        // }
+      }
+      // console.log('**************************');
+      // console.log(`2. Adding ${fileName}.`);
+      this.db[fileName] = {
+        // hash,
+        path: filePath,
+        // directory,
+        links: /^.+\.md$/.test(fileName) ? this.extractLinks(filePath) : {}
+      };
+      // console.log(`2. Added ${fileName}.`);
+      // console.log('**************************');
+    });
+    return this.db;
   }
 
   //update the file's data in storage
@@ -130,6 +164,10 @@ export class UpMarkdown {
     // for (let m in matches) { console.log(matches[m]); }
     return matches;
   }
+
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
 
   //find outdated links to all files or specified files
   findOutdatedLinks(files: string[] = []): void {
@@ -224,11 +262,9 @@ export class UpMarkdown {
 /* [ToDo:]
 
 _Functionality_
-- VScode API: Persistent storage.
 - VScode API: FS watcher for file rename/moved/deleted/edited(?).
 
 _Bugs_
-- Replace placeholder SetTimeout occurrences with logical code / async/await / promises.
 - Fix bug: all files must have unique names.
 
 _Other_

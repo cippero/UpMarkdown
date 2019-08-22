@@ -15,7 +15,8 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [{
+    "commands": [
+      {
         "command": "extension.updateLinks",
         "title": "Update Markdown Links"
       },
@@ -25,7 +26,8 @@
       }
     ],
     "menus": {
-      "explorer/context": [{
+      "explorer/context": [
+        {
           "when": "explorerResourceIsFolder",
           "command": "extension.updateLinks",
           "group": "1_modification@1"
@@ -41,7 +43,9 @@
       "properties": {
         "upMarkdown.blacklist": {
           "type": "array",
-          "default": ["archive"],
+          "default": [
+            "archive"
+          ],
           "scope": "window",
           "description": "Specifies which files and folders should be ignored."
         }
@@ -63,6 +67,8 @@
     "@types/mocha": "^2.2.42"
   },
   "dependencies": {
-    "fs": "0.0.1-security"
+    "@types/lodash.partition": "^4.6.6",
+    "fs": "0.0.1-security",
+    "lodash.partition": "^4.6.0"
   }
 }
