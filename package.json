@@ -15,19 +15,17 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
+    "commands": [{
         "command": "extension.updateLinks",
         "title": "Update Markdown Links"
       },
       {
         "command": "extension.toggleBlacklist",
-        "title": "Add"
+        "title": "Add/Remove from upMarkdown Blacklist"
       }
     ],
     "menus": {
-      "explorer/context": [
-        {
+      "explorer/context": [{
           "when": "explorerResourceIsFolder",
           "command": "extension.updateLinks",
           "group": "1_modification@1"

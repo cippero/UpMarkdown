@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 const partition = require('lodash.partition');
 // import * as c from 'crypto';
 
-export interface IPaths {
+interface IFiles {
   [filePath: string]: {
     path: string;
     // directory: string;
@@ -22,6 +22,12 @@ export interface IPaths {
   };
 }
 
+interface IDate {
+  updated: Date;
+}
+
+export type IPaths = IFiles & IDate;
+
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
   private readonly DIR: string;
@@ -31,7 +37,7 @@ export class UpMarkdown {
 
   constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { [filePath: string]: null }) {
     this.DIR = dirInput;
-    this.db = dbInput || {};
+    this.db = dbInput || {} as IPaths;
     this.blacklist = blacklistInput || {};
   }
 
@@ -65,6 +71,7 @@ export class UpMarkdown {
   getFilePaths(folderPath: string = this.DIR): any {
     if (folderPath === '') { throw console.error('No input directory specified.'); }
     if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
+    this.db.updated = new Date(Date.now());
 
     let entryPaths: string[] = [];
     try {
@@ -259,6 +266,9 @@ export class UpMarkdown {
   }
 }
 
+
+
+
 /* [ToDo:]
 
 _Functionality_
@@ -269,5 +279,20 @@ _Bugs_
 
 _Other_
 - Add UI to blacklist functionality? And then store blacklisted items by path instead of file name.
+  - Fix: currently getting and updating extension settings isn't affecting the actual settings.json file to edit/view manually.
 
+_Extension Process_
+- Update Links:
+  - FS scan to derive storage
+  - Update all outdated links
+  - Timestamp of when this function was run
+
+- Watch Directory:
+  - If storage doesn't exists || timestamp < x : Update Links func
+  - FS scan to update storage every x time
+  - File changes:
+    - rename: change key of file in storage if doesn't already exist, otherwise notify user of duplicate
+    - moved: change path of file in storage, update links of referred files and referring files
+    - deleted: delete from storage
+    - edited: scan file and update links if necessary
 */
