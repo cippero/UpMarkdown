@@ -9,52 +9,21 @@ export function activate(context: vscode.ExtensionContext) {
     // const folderName = path.dirname(e.path);
     // const folderUrl = vscode.Uri.file(folderName);
     // vscode.commands.executeCommand('setContext', 'key', 'Remove');
-
     // const val: string = context.globalState.get("test", "defaultValue");
     // context.globalState.update("test", "this is not test");
-    // vscode.window.showInformationMessage(val);
-    // console.log(vscode.workspace.rootPath);
 
     let storage: IPaths | undefined = await context.workspaceState.get("umdStorage", undefined);
-    // console.log('----------vscode storage:');
-    // console.log(storage);
     const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
     let blacklist: { [file: string]: null } = {};
     bl.forEach((item: any) => { blacklist[item] = null; });
-
-    const uMd = new UpMarkdown(path || '', undefined, blacklist);
+    // const uMd = new UpMarkdown(path || '', undefined, blacklist);
+    const uMd = new UpMarkdown(path || '', storage, blacklist);
     storage = uMd.saveFiles(uMd.getFilePaths());
     context.workspaceState.update('umdStorage', storage);
     uMd.findOutdatedLinks();
-
-
-    // storage = context.workspaceState.get("umdStorage", undefined);
-    // console.log('----------vscode storage:');
-    // console.log(storage);
   }));
 
-  // context.subscriptions.push(vscode.commands.registerCommand('extension.addToBlacklist', async (path) => {
-  //   const { blacklist } = await vscode.workspace.getConfiguration('upMarkdown');
-  //   // const blacklist: string[] = ['/home/gilwein/code/projects/upmarkdown/src/azure-iot-mobility-services/articles/operators'];
-  //   if (!blacklist.includes(p.basename(path))) { vscode.commands.executeCommand('setContext', 'blacklist', true); }
-  //   else { vscode.commands.executeCommand('setContext', 'blacklist', false); }
-
-  //   console.log('adding to blacklist');
-  //   // add to blacklist settings
-  // }));
-
-  // context.subscriptions.push(vscode.commands.registerCommand('extension.removeFromBlacklist', async (path) => {
-  //   const { blacklist } = await vscode.workspace.getConfiguration('upMarkdown');
-  //   // const blacklist: string[] = ['/home/gilwein/code/projects/upmarkdown/src/azure-iot-mobility-services/articles/operators'];
-  //   if (!blacklist.includes(p.basename(path))) { vscode.commands.executeCommand('setContext', 'blacklist', false); }
-  //   else { vscode.commands.executeCommand('setContext', 'blacklist', false); }
-
-  //   console.log('removing from blacklist');
-  //   // remove from blacklist settings
-  // }));
-
   context.subscriptions.push(vscode.commands.registerCommand('extension.toggleBlacklist', async ({ path }) => {
-    // let { blacklist } = await vscode.workspace.getConfiguration('upMarkdown');
     const fileName: string = p.basename(path);
     const config = await vscode.workspace.getConfiguration('upMarkdown');
     let blacklist: string[] = config.get('blacklist', []);
@@ -73,8 +42,8 @@ export function activate(context: vscode.ExtensionContext) {
       await config.update('blacklist', blacklist);
     } catch (err) { throw new Error(`Error updating the blacklist, see your Json settings to edit it manually. \n${err}`); }
 
-    const message: string = blacklist.length > 0 ? `includes: ${blacklist.join(', ')}` : 'is now empty';
-    vscode.window.showInformationMessage(`'${fileName}' ${operation} the blacklist, which ${message}. See your Json settings to edit it manually.`);
+    const message: string = blacklist.length > 0 ? `(${blacklist.join(', ')})` : '(blacklist is empty)';
+    vscode.window.showInformationMessage(`'${fileName}' ${operation} the blacklist ${message}. See your local workspace settings to edit it manually.`);
   }));
 }
 

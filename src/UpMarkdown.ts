@@ -1,13 +1,11 @@
 import * as fs from 'fs';
 import * as p from 'path';
-import * as vscode from 'vscode';
 const partition = require('lodash.partition');
 // import * as c from 'crypto';
 
 interface IFiles {
   [filePath: string]: {
     path: string;
-    // directory: string;
     // hash: string;
     links: {
       [fileName: string]: {
@@ -22,9 +20,7 @@ interface IFiles {
   };
 }
 
-interface IDate {
-  updated: Date;
-}
+interface IDate { updated: Date; }
 
 export type IPaths = IFiles & IDate;
 
@@ -35,45 +31,23 @@ export class UpMarkdown {
   db: IPaths;
   blacklist: { [filePath: string]: null };
 
-  constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { [filePath: string]: null }) {
+  constructor(
+    dirInput: string,
+    dbInput?: IPaths,
+    blacklistInput?: { [filePath: string]: null }
+  ) {
     this.DIR = dirInput;
     this.db = dbInput || {} as IPaths;
     this.blacklist = blacklistInput || {};
   }
-
-  // //scan to store file structure snapshot in storage
-  // scanFiles(directory: string = this.DIR): void {
-  //   if (directory === '') { throw console.error('No input directory specified.'); }
-  //   if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
-
-  //   fs.readdir(directory, (err, files): void => {
-  //     if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
-  //     files.forEach((fileName) => {
-  //       const filePath = directory + '/' + fileName;
-
-  //       if (fs.existsSync(filePath)) {
-  //         if (typeof this.blacklist[fileName] !== 'undefined') {
-  //           console.log(`'${fileName}' in blacklist, skipping.`);
-  //         } else {
-  //           const stats = fs.lstatSync(filePath);
-  //           if (stats.isDirectory()) {
-  //             // pendingRecursive++;
-  //             this.scanFiles(filePath);
-  //           }
-  //           else if (stats.isFile()) { this.saveFile(fileName, filePath); }
-  //         }
-  //       }
-  //     });
-  //   });
-  // }
 
   //gets a list of all files in the directory
   getFilePaths(folderPath: string = this.DIR): any {
     if (folderPath === '') { throw console.error('No input directory specified.'); }
     if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
     this.db.updated = new Date(Date.now());
-
     let entryPaths: string[] = [];
+
     try {
       // adds full path to each file name in current directory
       entryPaths = fs.readdirSync(folderPath).reduce((result: string[], entry: string) => {
@@ -82,7 +56,7 @@ export class UpMarkdown {
         } else { result.push(p.join(folderPath, entry)); }
         return result;
       }, []);
-    } catch (err) { throw console.error(`Error reading directory ${folderPath}: \n${err}`); }
+    } catch (err) { console.error(`Error reading directory ${folderPath}, skipping. Error: \n${err}`); }
 
     // filters all the full paths and separates into an array of files and an array of directories
     const [filePaths, dirPaths]: [string[], string[]] = partition(entryPaths, (entryPath: string) => {
@@ -118,31 +92,6 @@ export class UpMarkdown {
     });
     return this.db;
   }
-
-  //update the file's data in storage
-  // updateFile(fileName: string, filePath: string): void {
-  //   const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
-  //   if (typeof this.db[fileName] !== 'undefined') {
-  //     console.log(`2. ${fileName} already exists in storage.`);
-  //     if (this.db[fileName].hash !== hash) {
-  //       this.db[fileName].links = this.extractLinks(filePath);
-  //       console.log(`  Updated $LINKS for ${fileName}.`);
-  //       // } else {
-  //       // console.log(`  Didn't update $LINKS for ${fileName} - hash hasn't changed:\n
-  //       // old: ${this.db[fileName].hash}\n
-  //       // new: ${hash}`);
-  //     }
-  //     if (this.db[fileName].path !== filePath) {
-  //       this.db[fileName].path = filePath;
-  //       console.log(`  Updated $PATH for ${fileName}.`);
-  //       this.updateRefs(fileName);
-  //       // } else {
-  //       //   console.log(`  Didn't update $PATH for ${fileName} - path hasn't changed:\n
-  //       //   old: ${this.db[fileName].path}\n
-  //       //   new: ${filePath}`);
-  //     }
-  //   }
-  // }
 
   //extract links that refer to other files from current file
   extractLinks(filePath: string): IPaths["filePath"]["links"] {
