@@ -37,15 +37,19 @@ export class UpMarkdown {
     blacklistInput?: { [filePath: string]: null }
   ) {
     this.DIR = dirInput;
-    this.db = dbInput || {} as IPaths;
     this.blacklist = blacklistInput || {};
+    if (typeof dbInput !== 'undefined') {
+      this.db = dbInput;
+    } else {
+      this.db = {} as IPaths;
+      this.db.updated = new Date(Date.now());
+    }
   }
 
   //gets a list of all files in the directory
   getFilePaths(folderPath: string = this.DIR): any {
     if (folderPath === '') { throw console.error('No input directory specified.'); }
     if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
-    this.db.updated = new Date(Date.now());
     let entryPaths: string[] = [];
 
     try {
@@ -73,6 +77,7 @@ export class UpMarkdown {
     files.forEach((filePath: string) => {
       const fileName = p.basename(filePath);
       if (typeof this.db[fileName] !== 'undefined') {
+        console.log(this.db.updated);
         // if (this.db[fileName].directory === directory) {
         return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
         // console.log(` - Current directory: ${directory}`);
@@ -152,10 +157,8 @@ export class UpMarkdown {
       this.updateLinks(fileName, fileChanges);
       fileChanges = [];
     });
-    setTimeout(_ => {
-      this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
-      this.changeLog = '';
-    }, 1000);
+    this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('No links were updated.');
+    this.changeLog = '';
   }
 
   //update links to current file
@@ -193,6 +196,21 @@ export class UpMarkdown {
     });
   }
 
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+
+  //watch for file edits
+  // watchFiles(): void {
+  //   const interval: number = 60000; // 1 minute
+  //   const elapsed: number = new Date(Date.now()).getTime() - this.db.updated.getTime();
+  //   if (elapsed >= interval) {
+  //     console.log(`File system updated less than ${interval / 1000} seconds ago, not scanning the entire system.`);
+  //   } else {
+  //     this.sc
+  //   }
+  // }
+
   // //watch for file edits
   // watchFiles(): void {
   //   fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
@@ -228,7 +246,6 @@ _Bugs_
 
 _Other_
 - Add UI to blacklist functionality? And then store blacklisted items by path instead of file name.
-  - Fix: currently getting and updating extension settings isn't affecting the actual settings.json file to edit/view manually.
 
 _Extension Process_
 - Update Links:
