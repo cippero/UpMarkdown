@@ -1,8 +1,22 @@
 import * as vscode from 'vscode';
 import * as p from 'path';
-import { UpMarkdown, IPaths } from './UpMarkdown';
+import { UpMarkdown, IPaths, IBlacklist } from './UpMarkdown';
+
+class Utils {
+  private blacklist = {} as IBlacklist;
+
+  async getBlacklist(): Promise<IBlacklist> {
+    if (Object.keys(this.blacklist).length > 0) { return this.blacklist; }
+    const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
+    let blacklist = {} as IBlacklist;
+    bl.forEach((item: any) => { blacklist[item] = null; });
+    this.blacklist = blacklist;
+    return Promise.resolve(blacklist);
+  }
+}
 
 export function activate(context: vscode.ExtensionContext) {
+  const utils: Utils = new Utils();
   // vscode.commands.executeCommand('setContext', 'blacklist', false);
 
   context.subscriptions.push(vscode.commands.registerCommand('extension.updateLinks', async ({ path }) => {
@@ -12,15 +26,13 @@ export function activate(context: vscode.ExtensionContext) {
     // const val: string = context.globalState.get("test", "defaultValue");
     // context.globalState.update("test", "this is not test");
 
-    let storage: IPaths | undefined = await context.workspaceState.get("umdStorage", undefined);
-    const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
-    let blacklist: { [file: string]: null } = {};
-    bl.forEach((item: any) => { blacklist[item] = null; });
-    // const uMd = new UpMarkdown(path || '', undefined, blacklist);
-    const uMd = new UpMarkdown(path || '', storage, blacklist);
-    storage = uMd.saveFiles(uMd.getFilePaths());
-    uMd.findOutdatedLinks();
-    context.workspaceState.update('umdStorage', storage);
+    const blacklist = await utils.getBlacklist();
+    let fileSystem: IPaths | undefined = await context.workspaceState.get("umdFS", undefined);
+
+    const umd = new UpMarkdown(path, fileSystem, blacklist);
+    fileSystem = umd.saveFiles(umd.getFilePaths());
+    umd.findOutdatedLinks();
+    context.workspaceState.update('umdFS', fileSystem);
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('extension.toggleBlacklist', async ({ path }) => {
@@ -47,25 +59,22 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('extension.watchDirectory', async ({ path }) => {
-    const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
-    let blacklist: { [file: string]: null } = {};
-    bl.forEach((item: any) => { blacklist[item] = null; });
-
-    let storage: IPaths | undefined = await context.workspaceState.get("umdStorage", undefined);
-    let updateStorage: boolean = true;
-    if (typeof storage !== 'undefined') {
+    let fileSystem: IPaths | undefined = await context.workspaceState.get("umdFS", undefined);
+    let updateFileSystem: boolean = true;
+    if (typeof fileSystem !== 'undefined') {
       const interval: number = 60000; // 1 minute
-      const elapsed: number = new Date(Date.now()).getTime() - storage!.updated.getTime();
-      updateStorage = elapsed <= interval ? false : true;
+      const elapsed: number = new Date(Date.now()).getTime() - fileSystem!.updated.getTime();
+      updateFileSystem = elapsed <= interval ? false : true;
     }
 
-    const uMd = new UpMarkdown(path || '', storage, blacklist);
-    if (updateStorage) { storage = uMd.saveFiles(uMd.getFilePaths()); }
-    // add update storage class function and clean up file skip "if duplicate" in saveFile func based on timestamp
+    const blacklist = await utils.getBlacklist();
+    const umd = new UpMarkdown(path, undefined, blacklist);
+    if (updateFileSystem) { fileSystem = umd.saveFiles(umd.getFilePaths()); }
+    //clean up file skip "if duplicate" in saveFile func based on timestamp
 
-    // watch for file changes
-    uMd.findOutdatedLinks(['update a file that was changed']);
-    context.workspaceState.update('umdStorage', storage);
+    //watch for file changes
+    // umd.findOutdatedLinks(['update a file that was changed']);
+    // context.workspaceState.update('umdFS', fileSystem);
   }));
 }
 
