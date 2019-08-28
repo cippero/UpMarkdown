@@ -1,44 +1,54 @@
 import * as vscode from 'vscode';
 import * as p from 'path';
-import { UpMarkdown, IPaths, IBlacklist } from './UpMarkdown';
-
-class Utils {
-  private blacklist = {} as IBlacklist;
-
-  async getBlacklist(): Promise<IBlacklist> {
-    if (Object.keys(this.blacklist).length > 0) { return this.blacklist; }
-    const { blacklist: bl } = await vscode.workspace.getConfiguration('upMarkdown');
-    let blacklist = {} as IBlacklist;
-    bl.forEach((item: any) => { blacklist[item] = null; });
-    this.blacklist = blacklist;
-    return Promise.resolve(blacklist);
-  }
-}
+import { UpMarkdown } from './UpMarkdown';
+import { Utils } from './utils/utils';
 
 export function activate(context: vscode.ExtensionContext) {
-  const utils: Utils = new Utils();
   // vscode.commands.executeCommand('setContext', 'blacklist', false);
+  // const val: string = context.globalState.get("test", "defaultValue");
+  // context.globalState.update("test", "this is not test");
+  const utils: Utils = new Utils();
+  const umd = new UpMarkdown();
 
-  context.subscriptions.push(vscode.commands.registerCommand('extension.updateLinks', async ({ path }) => {
-    // const folderName = path.dirname(e.path);
-    // const folderUrl = vscode.Uri.file(folderName);
-    // vscode.commands.executeCommand('setContext', 'key', 'Remove');
-    // const val: string = context.globalState.get("test", "defaultValue");
-    // context.globalState.update("test", "this is not test");
+  context.subscriptions.push(vscode.commands.registerCommand('extension.updateLinks', ({ path }) => {
+    utils.updateFileSystem(umd, path);
+  }));
 
-    const blacklist = await utils.getBlacklist();
-    let fileSystem: IPaths | undefined = await context.workspaceState.get("umdFS", undefined);
+  context.subscriptions.push(vscode.commands.registerCommand('extension.startFsWatch', async ({ path }) => {
+    await utils.checkFS(path); //turns off watcher if another exists and switches to this one
+    const config = await vscode.workspace.getConfiguration('upMarkdown');
+    let updateFileSystem: boolean = true;
+    if (typeof umd.fileSystem !== 'undefined') {
+      const interval: number = await config.get('scanInterval', 60) * 1000; // defaults to 1min
+      const elapsed: number = new Date(Date.now()).getTime() - umd.fileSystem!.updated.getTime();
+      if (elapsed <= interval) { updateFileSystem = false; }
+    }
 
-    const umd = new UpMarkdown(path, fileSystem, blacklist);
-    fileSystem = umd.saveFiles(umd.getFilePaths());
-    umd.findOutdatedLinks();
-    context.workspaceState.update('umdFS', fileSystem);
+    if (updateFileSystem) { utils.updateFileSystem(umd, path); }
+    //clean up file skip "if duplicate" in saveFile func based on timestamp
+
+    //watch for file changes
+    // var watcher = vscode.workspace.createFileSystemWatcher("**/*.md"); //glob search string
+    // watcher.ignoreChangeEvents = false;
+
+    // watcher.onDidChange(() => {
+    //   vscode.window.showInformationMessage("change applied!"); //In my opinion this should be called
+    // });
+    // umd.findOutdatedLinks(['update a file that was changed']);
+    // context.workspaceState.update('umdFileSystem', fileSystem);
+    vscode.commands.executeCommand('setContext', 'FsWatcherOn', true);
+  }));
+
+  context.subscriptions.push(vscode.commands.registerCommand('extension.stopFsWatch', async ({ path }) => {
+    // turn off watcher
+    vscode.commands.executeCommand('setContext', 'FsWatcherOn', false);
+    utils.fs = '';
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('extension.toggleBlacklist', async ({ path }) => {
-    const fileName: string = p.basename(path);
     const config = await vscode.workspace.getConfiguration('upMarkdown');
-    let blacklist: string[] = config.get('blacklist', []);
+    const fileName: string = p.basename(path);
+    let blacklist: string[] = await config.get('blacklist', []);
     let operation: string = '';
 
     if (!blacklist.includes(fileName)) {
@@ -56,26 +66,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     const message: string = blacklist.length > 0 ? `(${blacklist.join(', ')})` : '(blacklist is empty)';
     vscode.window.showInformationMessage(`'${fileName}' ${operation} the blacklist ${message}. See your local workspace settings to edit it manually.`);
+    umd.blacklist = await utils.getBlacklist(blacklist);
   }));
 
-  context.subscriptions.push(vscode.commands.registerCommand('extension.watchDirectory', async ({ path }) => {
-    let fileSystem: IPaths | undefined = await context.workspaceState.get("umdFS", undefined);
-    let updateFileSystem: boolean = true;
-    if (typeof fileSystem !== 'undefined') {
-      const interval: number = 60000; // 1 minute
-      const elapsed: number = new Date(Date.now()).getTime() - fileSystem!.updated.getTime();
-      updateFileSystem = elapsed <= interval ? false : true;
-    }
-
-    const blacklist = await utils.getBlacklist();
-    const umd = new UpMarkdown(path, undefined, blacklist);
-    if (updateFileSystem) { fileSystem = umd.saveFiles(umd.getFilePaths()); }
-    //clean up file skip "if duplicate" in saveFile func based on timestamp
-
-    //watch for file changes
-    // umd.findOutdatedLinks(['update a file that was changed']);
-    // context.workspaceState.update('umdFS', fileSystem);
-  }));
 }
 
 export function deactivate() { }

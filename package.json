@@ -10,29 +10,49 @@
     "Other"
   ],
   "activationEvents": [
+    "onCommand:extension.startFsWatch",
+    "onCommand:extension.stopFsWatch",
     "onCommand:extension.updateLinks",
     "onCommand:extension.toggleBlacklist"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [{
+        "command": "extension.startFsWatch",
+        "title": "upMarkdown: Start FileSystem Updater"
+      },
+      {
+        "command": "extension.stopFsWatch",
+        "title": "upMarkdown: Stop FileSystem Updater"
+      },
+      {
         "command": "extension.updateLinks",
-        "title": "Update Markdown Links"
+        "title": "upMarkdown: Update Links"
       },
       {
         "command": "extension.toggleBlacklist",
-        "title": "Add/Remove from upMarkdown Blacklist"
+        "title": "upMarkdown: Toggle Blacklist"
       }
     ],
     "menus": {
       "explorer/context": [{
-          "when": "explorerResourceIsFolder",
+          "command": "extension.startFsWatch",
+          "group": "1_modification@1",
+          "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "extension.stopFsWatch",
+          "group": "1_modification@2",
+          "when": "FsWatcherOn"
+        },
+        {
           "command": "extension.updateLinks",
-          "group": "1_modification@1"
+          "group": "1_modification@3",
+          "when": "explorerResourceIsFolder"
         },
         {
           "command": "extension.toggleBlacklist",
-          "group": "1_modification@2"
+          "group": "1_modification@4"
         }
       ]
     },
@@ -41,11 +61,15 @@
       "properties": {
         "upMarkdown.blacklist": {
           "type": "array",
-          "default": [
-            "archive"
-          ],
+          "default": ["archive"],
           "scope": "window",
           "description": "Specifies which files and folders should be ignored."
+        },
+        "upMarkdown.scanInterval": {
+          "type": "number",
+          "default": 60,
+          "scope": "window",
+          "description": "If more seconds have passed since the last time the file system was scanned than the interval value, the file system will be scanned again. This setting only applies when turning on the automatic FS Watcher."
         }
       }
     }

@@ -1,12 +1,13 @@
 import * as fs from 'fs';
 import * as p from 'path';
+import * as c from 'crypto';
 const partition = require('lodash.partition');
-// import * as c from 'crypto';
 
 interface IFiles {
   [filePath: string]: {
     path: string;
-    // hash: string;
+    directory: string;
+    hash: string;
     links: {
       [fileName: string]: {
         linkInstances: [{
@@ -29,17 +30,17 @@ export type IBlacklist = { [filePath: string]: null };
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
   private changeLog: string = '';
-  dir: string = '';
+  // dir: string = '';
   fileSystem: IPaths;
   blacklist: IBlacklist;
 
   constructor(
-    dirInput?: string,
+    // dirInput?: string,
     dbInput?: IPaths,
     blacklistInput?: IBlacklist
   ) {
     this.blacklist = typeof blacklistInput !== 'undefined' ? blacklistInput : {} as IBlacklist;
-    this.dir = typeof dirInput !== 'undefined' ? dirInput : '';
+    // this.dir = typeof dirInput !== 'undefined' ? dirInput : '';
     if (typeof dbInput !== 'undefined') {
       this.fileSystem = dbInput;
     } else {
@@ -49,9 +50,9 @@ export class UpMarkdown {
   }
 
   //gets a list of all files in the directory
-  getFilePaths(filePath: string = this.dir): any {
+  getFilePaths(filePath: string = ''): any {
     if (filePath === '') { throw console.error('No input directory specified.'); }
-    if (typeof this.blacklist[this.dir] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
+    // if (typeof this.blacklist[this.dir] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
     let entryPaths: string[] = [];
 
     try {
@@ -76,26 +77,31 @@ export class UpMarkdown {
 
   //save the file's data in storage
   saveFiles(files: string[]): IPaths {
+    const saveFile = (name: string, path: string, directory: string, hash: string): void => {
+      this.fileSystem[name] = {
+        hash,
+        path,
+        directory,
+        links: /^.+\.md$/.test(name) ? this.extractLinks(path) : {}
+      };
+    };
     files.forEach((filePath: string) => {
       const fileName = p.basename(filePath);
+      const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
+      const directory = p.dirname(filePath);
       if (typeof this.fileSystem[fileName] !== 'undefined') {
-        console.log(this.fileSystem.updated);
-        // if (this.fileSystem[fileName].directory === directory) {
-        return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
-        // console.log(` - Current directory: ${directory}`);
-        // this.updateFile(fileName, filePath);
-        // }
+        if (this.fileSystem[fileName].hash !== hash) {
+          if (this.fileSystem[fileName].directory !== p.dirname(filePath)) {
+            // same name
+            return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
+            // refactor to save to array if multiple file names are the same
+          } else {
+            // same file
+            return saveFile(fileName, filePath, directory, hash);
+          }
+        }
       }
-      // console.log('**************************');
-      // console.log(`2. Adding ${fileName}.`);
-      this.fileSystem[fileName] = {
-        // hash,
-        path: filePath,
-        // directory,
-        links: /^.+\.md$/.test(fileName) ? this.extractLinks(filePath) : {}
-      };
-      // console.log(`2. Added ${fileName}.`);
-      // console.log('**************************');
+      saveFile(fileName, filePath, directory, hash);
     });
     return this.fileSystem;
   }
@@ -253,12 +259,12 @@ _Other_
 _Extension Process_
 - Update Links:
   - FS scan to derive storage
+    - if file already exists in storage: crypto changed ? scan file : skip
   - Update all outdated links
   - Timestamp of when this function was run
 
 - Watch Directory:
   - If storage doesn't exists || timestamp < x : Update Links func
-  - FS scan to update storage every x time
   - File changes:
     - rename: change key of file in storage if doesn't already exist, otherwise notify user of duplicate
     - moved: change path of file in storage, update links of referred files and referring files
