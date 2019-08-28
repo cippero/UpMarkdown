@@ -2,20 +2,19 @@ import * as vscode from 'vscode';
 import { UpMarkdown, IPaths, IBlacklist } from '../UpMarkdown';
 
 export class Utils {
-  // private blacklist = {} as IBlacklist;
   fs: string = '';
 
-  async getBlacklist(blacklistArr?: string[]): Promise<IBlacklist> {
-    //add try/catch to await
-    // if (Object.keys(this.blacklist).length > 0) { return Promise.resolve(this.blacklist); }
-    if (typeof blacklistArr === 'undefined') {
-      const config = await vscode.workspace.getConfiguration('upMarkdown');
-      blacklistArr = await config.get('blacklist', []);
+  //checks if there's already an instance of FS watcher running
+  checkFS(path: string) {
+    if (this.fs !== '') {
+      console.log(`Can only watch one directory at a time: switching from ${this.fs} to ${path}`);
+      vscode.commands.executeCommand('extension.stopFsWatch', { path: this.fs }); // await?
+    } else if (this.fs === path) {
+      console.log(`Action cancelled: already watching ${path}`);
+    } else {
+      console.log(`Watching for file changes in ${path}`);
     }
-    let blacklist = {} as IBlacklist;
-    blacklistArr.forEach((item: any) => { blacklist[item] = null; });
-    // this.blacklist = blacklist;
-    return Promise.resolve(blacklist);
+    this.fs = path;
   }
 
   async updateFileSystem(
@@ -29,15 +28,43 @@ export class Utils {
     return Promise.resolve(fileSystem);
   }
 
-  async checkFS(path: string) {
-    if (this.fs !== '') {
-      console.log(`Can only watch one directory at a time: switching from ${this.fs} to ${path}`);
-      await vscode.commands.executeCommand('extension.stopFsWatch', { path: this.fs });
-    } else if (this.fs === path) {
-      console.log(`Action cancelled: already watching ${path}`);
-    } else {
-      console.log(`Watching for file changes in ${path}`);
+  //adds/removes item from blacklist, returning the object
+  async toggleBlacklist(
+    fileName: string,
+    blacklist: string[],
+  ): Promise<IBlacklist> {
+    let operation: string = '';
+
+    if (!blacklist.includes(fileName)) {
+      operation = 'added to';
+      blacklist.push(fileName);
     }
-    this.fs = path;
+    else {
+      operation = 'removed from';
+      blacklist = blacklist.filter((item: any) => { return item !== fileName; });
+    }
+
+    const message: string = blacklist.length > 0 ? `(${blacklist.join(', ')})` : '(blacklist is empty)';
+    vscode.window.showInformationMessage(`'${fileName}' ${operation} the blacklist ${message}. See your local workspace settings to edit it manually.`);
+
+    return Promise.resolve(await this.getBlacklist(blacklist));
+  }
+
+  //returns a blacklist object
+  async getBlacklist(blacklistArr?: string[]): Promise<IBlacklist> {
+    //add try/catch to await
+    const config = await vscode.workspace.getConfiguration('upMarkdown');
+    if (typeof blacklistArr === 'undefined') {
+      blacklistArr = await config.get('blacklist', []);
+    } else {
+      try {
+        await config.update('blacklist', blacklistArr);
+      } catch (err) {
+        throw new Error(`Error updating the blacklist, see your local workspace settings to edit it manually. \n${err}`);
+      }
+    }
+    let blacklist = {} as IBlacklist;
+    blacklistArr.forEach((item: any) => { blacklist[item] = null; });
+    return Promise.resolve(blacklist);
   }
 }

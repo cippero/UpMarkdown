@@ -3,7 +3,7 @@ import * as p from 'path';
 import * as c from 'crypto';
 const partition = require('lodash.partition');
 
-interface IFiles {
+export interface IPaths {
   [filePath: string]: {
     path: string;
     directory: string;
@@ -20,10 +20,6 @@ interface IFiles {
     };
   };
 }
-
-interface IDate { updated: Date; }
-
-export type IPaths = IFiles & IDate;
 
 export type IBlacklist = { [filePath: string]: null };
 
@@ -45,7 +41,6 @@ export class UpMarkdown {
       this.fileSystem = dbInput;
     } else {
       this.fileSystem = {} as IPaths;
-      this.fileSystem.updated = new Date();
     }
   }
 
