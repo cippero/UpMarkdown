@@ -1,14 +1,13 @@
 import * as fs from 'fs';
 import * as p from 'path';
-import * as vscode from 'vscode';
+import * as c from 'crypto';
 const partition = require('lodash.partition');
-// import * as c from 'crypto';
 
 export interface IPaths {
   [filePath: string]: {
     path: string;
-    // directory: string;
-    // hash: string;
+    directory: string;
+    hash: string;
     links: {
       [fileName: string]: {
         linkInstances: [{
@@ -22,60 +21,44 @@ export interface IPaths {
   };
 }
 
+export type IBlacklist = { [filePath: string]: null };
+
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
-  private readonly DIR: string;
   private changeLog: string = '';
-  db: IPaths;
-  blacklist: { [filePath: string]: null };
+  // dir: string = '';
+  fileSystem: IPaths;
+  blacklist: IBlacklist;
 
-  constructor(dirInput: string, dbInput?: IPaths, blacklistInput?: { [filePath: string]: null }) {
-    this.DIR = dirInput;
-    this.db = dbInput || {};
-    this.blacklist = blacklistInput || {};
+  constructor(
+    // dirInput?: string,
+    dbInput?: IPaths,
+    blacklistInput?: IBlacklist
+  ) {
+    this.blacklist = typeof blacklistInput !== 'undefined' ? blacklistInput : {} as IBlacklist;
+    // this.dir = typeof dirInput !== 'undefined' ? dirInput : '';
+    if (typeof dbInput !== 'undefined') {
+      this.fileSystem = dbInput;
+    } else {
+      this.fileSystem = {} as IPaths;
+    }
   }
 
-  // //scan to store file structure snapshot in storage
-  // scanFiles(directory: string = this.DIR): void {
-  //   if (directory === '') { throw console.error('No input directory specified.'); }
-  //   if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
-
-  //   fs.readdir(directory, (err, files): void => {
-  //     if (err) { throw console.error(`Error reading directory ${directory}: \n${err}`); }
-  //     files.forEach((fileName) => {
-  //       const filePath = directory + '/' + fileName;
-
-  //       if (fs.existsSync(filePath)) {
-  //         if (typeof this.blacklist[fileName] !== 'undefined') {
-  //           console.log(`'${fileName}' in blacklist, skipping.`);
-  //         } else {
-  //           const stats = fs.lstatSync(filePath);
-  //           if (stats.isDirectory()) {
-  //             // pendingRecursive++;
-  //             this.scanFiles(filePath);
-  //           }
-  //           else if (stats.isFile()) { this.saveFile(fileName, filePath); }
-  //         }
-  //       }
-  //     });
-  //   });
-  // }
-
   //gets a list of all files in the directory
-  getFilePaths(folderPath: string = this.DIR): any {
-    if (folderPath === '') { throw console.error('No input directory specified.'); }
-    if (typeof this.blacklist[this.DIR] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
-
+  getFilePaths(filePath: string = ''): any {
+    if (filePath === '') { throw console.error('No input directory specified.'); }
+    // if (typeof this.blacklist[this.dir] !== 'undefined') { throw console.error('Can\'t blacklist the main directory to be processed. Please remove the main directory from the blacklist and try again.'); }
     let entryPaths: string[] = [];
+
     try {
       // adds full path to each file name in current directory
-      entryPaths = fs.readdirSync(folderPath).reduce((result: string[], entry: string) => {
+      entryPaths = fs.readdirSync(filePath).reduce((result: string[], entry: string) => {
         if (typeof this.blacklist[entry] !== 'undefined') {
           console.log(`'${entry}' in blacklist, skipping.`);
-        } else { result.push(p.join(folderPath, entry)); }
+        } else { result.push(p.join(filePath, entry)); }
         return result;
       }, []);
-    } catch (err) { throw console.error(`Error reading directory ${folderPath}: \n${err}`); }
+    } catch (err) { console.error(`Error reading directory ${filePath}, skipping. Error: \n${err}`); }
 
     // filters all the full paths and separates into an array of files and an array of directories
     const [filePaths, dirPaths]: [string[], string[]] = partition(entryPaths, (entryPath: string) => {
@@ -89,53 +72,34 @@ export class UpMarkdown {
 
   //save the file's data in storage
   saveFiles(files: string[]): IPaths {
+    const saveFile = (name: string, path: string, directory: string, hash: string): void => {
+      this.fileSystem[name] = {
+        hash,
+        path,
+        directory,
+        links: /^.+\.md$/.test(name) ? this.extractLinks(path) : {}
+      };
+    };
     files.forEach((filePath: string) => {
       const fileName = p.basename(filePath);
-      if (typeof this.db[fileName] !== 'undefined') {
-        // if (this.db[fileName].directory === directory) {
-        return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
-        // console.log(` - Current directory: ${directory}`);
-        // this.updateFile(fileName, filePath);
-        // }
+      const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
+      const directory = p.dirname(filePath);
+      if (typeof this.fileSystem[fileName] !== 'undefined') {
+        if (this.fileSystem[fileName].hash !== hash) {
+          if (this.fileSystem[fileName].directory !== p.dirname(filePath)) {
+            // same name
+            return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
+            // refactor to save to array if multiple file names are the same
+          } else {
+            // same file
+            return saveFile(fileName, filePath, directory, hash);
+          }
+        }
       }
-      // console.log('**************************');
-      // console.log(`2. Adding ${fileName}.`);
-      this.db[fileName] = {
-        // hash,
-        path: filePath,
-        // directory,
-        links: /^.+\.md$/.test(fileName) ? this.extractLinks(filePath) : {}
-      };
-      // console.log(`2. Added ${fileName}.`);
-      // console.log('**************************');
+      saveFile(fileName, filePath, directory, hash);
     });
-    return this.db;
+    return this.fileSystem;
   }
-
-  //update the file's data in storage
-  // updateFile(fileName: string, filePath: string): void {
-  //   const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
-  //   if (typeof this.db[fileName] !== 'undefined') {
-  //     console.log(`2. ${fileName} already exists in storage.`);
-  //     if (this.db[fileName].hash !== hash) {
-  //       this.db[fileName].links = this.extractLinks(filePath);
-  //       console.log(`  Updated $LINKS for ${fileName}.`);
-  //       // } else {
-  //       // console.log(`  Didn't update $LINKS for ${fileName} - hash hasn't changed:\n
-  //       // old: ${this.db[fileName].hash}\n
-  //       // new: ${hash}`);
-  //     }
-  //     if (this.db[fileName].path !== filePath) {
-  //       this.db[fileName].path = filePath;
-  //       console.log(`  Updated $PATH for ${fileName}.`);
-  //       this.updateRefs(fileName);
-  //       // } else {
-  //       //   console.log(`  Didn't update $PATH for ${fileName} - path hasn't changed:\n
-  //       //   old: ${this.db[fileName].path}\n
-  //       //   new: ${filePath}`);
-  //     }
-  //   }
-  // }
 
   //extract links that refer to other files from current file
   extractLinks(filePath: string): IPaths["filePath"]["links"] {
@@ -172,23 +136,23 @@ export class UpMarkdown {
   //find outdated links to all files or specified files
   findOutdatedLinks(files: string[] = []): void {
     let fileChanges: [string, number][] = [];
-    files = files.length > 0 ? files : Object.keys(this.db);
+    files = files.length > 0 ? files : Object.keys(this.fileSystem);
     files.forEach((fileName) => {
       if (!/^.+\.md$/.test(fileName)) { return; }
-      const links: string[] = Object.keys(this.db[fileName].links);
+      const links: string[] = Object.keys(this.fileSystem[fileName].links);
 
       links.forEach((link) => {
-        if (typeof this.db[link] === 'undefined') {
+        if (typeof this.fileSystem[link] === 'undefined') {
           return console.error(`'${fileName}': Skipping the link to '${link}': a file with that name doesn't exist in storage.`);
         }
-        const newLinkPath: string = p.relative(this.db[fileName].path.substring(
-          0, this.db[fileName].path.length - fileName.length - 1), this.db[link].path);
+        const newLinkPath: string = p.relative(this.fileSystem[fileName].path.substring(
+          0, this.fileSystem[fileName].path.length - fileName.length - 1), this.fileSystem[link].path);
         // console.log(newLinkPath);
-        const linkInstances = this.db[fileName].links[link].linkInstances;
+        const linkInstances = this.fileSystem[fileName].links[link].linkInstances;
 
         linkInstances.forEach((inst, i) => {
           if (inst.oldLinkPath !== newLinkPath) {
-            this.db[fileName].links[link].linkInstances[i].newLinkPath = newLinkPath;
+            this.fileSystem[fileName].links[link].linkInstances[i].newLinkPath = newLinkPath;
             fileChanges.push([link, i]);
           }
         });
@@ -196,10 +160,8 @@ export class UpMarkdown {
       this.updateLinks(fileName, fileChanges);
       fileChanges = [];
     });
-    setTimeout(_ => {
-      this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('All links up to date.');
-      this.changeLog = '';
-    }, 1000);
+    this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('No links were updated.');
+    this.changeLog = '';
   }
 
   //update links to current file
@@ -211,15 +173,15 @@ export class UpMarkdown {
       throw console.error(`Error ${operation} ${fileName}: \n${err}`);
     };
 
-    let fileData: string = fs.readFileSync(this.db[fileName].path, 'utf8');
+    let fileData: string = fs.readFileSync(this.fileSystem[fileName].path, 'utf8');
 
-    fs.open(this.db[fileName].path, 'r+', (err, fd) => {
+    fs.open(this.fileSystem[fileName].path, 'r+', (err, fd) => {
       if (err) { throwError('opening', err); }
 
       let offset: number = 0;
 
       fileChanges.forEach(linkInstance => {
-        const inst = this.db[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
+        const inst = this.fileSystem[fileName].links[linkInstance[0]].linkInstances[linkInstance[1]];
 
         fileData = [fileData.slice(0, inst.locationInFile + offset), inst.newLinkPath,
         fileData.slice(inst.locationInFile + offset + inst.oldLinkPath.length)].join('');
@@ -229,7 +191,7 @@ export class UpMarkdown {
         changeLog += `  Link to '${linkInstance[0]}' @${inst.locationInFile}:\n    '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
       });
 
-      // fs.writeFile(this.db[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
+      // fs.writeFile(this.fileSystem[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
 
       fs.close(fd, (err) => { if (err) { throwError('closing', err); } });
 
@@ -237,32 +199,51 @@ export class UpMarkdown {
     });
   }
 
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+
+  //watch for file edits
+  // watchFiles(): void {
+  //   const interval: number = 60000; // 1 minute
+  //   const elapsed: number = Date.now() - this.fileSystem.updated.getTime();
+  //   if (elapsed >= interval) {
+  //     console.log(`File system updated less than ${interval / 1000} seconds ago, skipping another scan.`);
+  //   } else {
+  //     this.sc
+  //   }
+  // }
+
   // //watch for file edits
   // watchFiles(): void {
-  //   fs.watch(__dirname, { recursive: true }, (eventType: string, filename: string): void => {
+  //   fs.watch(_dirname, { recursive: true }, (eventType: string, filename: string): void => {
   //     if (filename) {
   //       console.log(`1. ${filename}: ${eventType}`);
   //       if (eventType === 'rename') {
   //         this.SaveOrUpdateFile('file1', sampleIPath.path);
-  //         console.log('3.', this.db);
+  //         console.log('3.', this.fileSystem);
   //       }
   //     }
   //   });
   // }
 
   printLinks(): void {
-    Object.keys(this.db).forEach(fileName => {
+    Object.keys(this.fileSystem).forEach(fileName => {
       console.log(`------------${fileName}---------------`);
-      console.log(this.db[fileName].links);
+      console.log(this.fileSystem[fileName].links);
       console.log('-----------------------------------------------');
     });
   }
 }
 
+
+
+
 /* [ToDo:]
 
 _Functionality_
 - VScode API: FS watcher for file rename/moved/deleted/edited(?).
+  - Add VS setting for time interval to scan fs
 
 _Bugs_
 - Fix bug: all files must have unique names.
@@ -270,4 +251,18 @@ _Bugs_
 _Other_
 - Add UI to blacklist functionality? And then store blacklisted items by path instead of file name.
 
+_Extension Process_
+- Update Links:
+  - FS scan to derive storage
+    - if file already exists in storage: crypto changed ? scan file : skip
+  - Update all outdated links
+  - Timestamp of when this function was run
+
+- Watch Directory:
+  - If storage doesn't exists || timestamp < x : Update Links func
+  - File changes:
+    - rename: change key of file in storage if doesn't already exist, otherwise notify user of duplicate
+    - moved: change path of file in storage, update links of referred files and referring files
+    - deleted: delete from storage
+    - edited: scan file and update links if necessary
 */
