@@ -23,7 +23,6 @@ export class Utils {
   ): Promise<IPaths> {
     umd.blacklist = await this.getBlacklist();
     const fileSystem: IPaths = umd.saveFiles(umd.getFilePaths(path));
-    // console.log(Object.keys(fileSystem));
     umd.findOutdatedLinks();
     // context.workspaceState.update('umdFileSystem', fileSystem);
     return Promise.resolve(fileSystem);

@@ -23,22 +23,24 @@ export interface IPaths {
 
 export type IBlacklist = { [filePath: string]: null };
 
+export enum Watcher {
+  Create = 0,
+  Change = 1,
+  Delete = 2,
+  Rename = 3,
+  Move = 4
+}
+
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
   private changeLog: string = '';
   fileSystem: IPaths;
   blacklist: IBlacklist;
+  // private watcherChanges: { filePath: string, action: Watcher }[] = [];
 
-  constructor(
-    dbInput?: IPaths,
-    blacklistInput?: IBlacklist
-  ) {
+  constructor(fileSystemInput?: IPaths, blacklistInput?: IBlacklist) {
     this.blacklist = typeof blacklistInput !== 'undefined' ? blacklistInput : {} as IBlacklist;
-    if (typeof dbInput !== 'undefined') {
-      this.fileSystem = dbInput;
-    } else {
-      this.fileSystem = {} as IPaths;
-    }
+    this.fileSystem = typeof fileSystemInput !== 'undefined' ? fileSystemInput : {} as IPaths;
   }
 
   //gets a list of all files in the directory
@@ -207,66 +209,98 @@ export class UpMarkdown {
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 
-  //watch for file edits
-  // watchFiles(): void {
-  //   const interval: number = 60000; // 1 minute
-  //   const elapsed: number = Date.now() - this.fileSystem.updated.getTime();
-  //   if (elapsed >= interval) {
-  //     console.log(`File system updated less than ${interval / 1000} seconds ago, skipping another scan.`);
-  //   } else {
-  //     this.sc
-  //   }
-  // }
+  // watch for file events
+  watchFiles(action: Watcher, filePath: string, oldFilePath?: string): void {
+    const fileName = p.basename(filePath);
+    switch (action) {
+      case Watcher.Change:
+        console.log(`EDIT ${filePath}`);
 
-  // //watch for file edits
-  // watchFiles(): void {
-  //   fs.watch(_dirname, { recursive: true }, (eventType: string, filename: string): void => {
-  //     if (filename) {
-  //       console.log(`1. ${filename}: ${eventType}`);
-  //       if (eventType === 'rename') {
-  //         this.SaveOrUpdateFile('file1', sampleIPath.path);
-  //         console.log('3.', this.fileSystem);
-  //       }
-  //     }
+        this.saveFiles([filePath]);
+        this.findOutdatedLinks([filePath]);
+        break;
+
+      case Watcher.Create:
+        console.log(`CREATE ${filePath}`);
+
+        this.saveFiles([filePath]);
+        this.findOutdatedLinks([filePath]);
+
+        //check if in misfits obj, then update referring files
+
+        break;
+
+      case Watcher.Delete:
+        console.log(`DELETE ${filePath}`);
+
+        //filter filePath out of this.fileSystem
+        this.fileSystem = ((file: string, { [file]: old, ...others }) => {
+          return { ...others };
+        })(fileName, this.fileSystem);
+
+        //output log of broken links to this file
+
+        break;
+
+      case Watcher.Rename:
+        console.log(`RENAME ${filePath} \nOld name: ${p.basename(oldFilePath!)}`);
+
+        // check if fileName already exists in storage
+
+        //update the file in storage
+        this.fileSystem = ((oldFileName: string, newFileName: string, { [oldFileName]: old, ...others }) => {
+          return { [newFileName]: old, ...others };
+        })(p.basename(oldFilePath!), fileName, this.fileSystem);
+        this.fileSystem[fileName].path = filePath;
+
+        //update link to this file in referring files
+
+        break;
+
+      case Watcher.Move:
+        console.log(`MOVE ${filePath}`);
+
+        this.fileSystem[fileName].path = filePath;
+        this.findOutdatedLinks([filePath]);
+
+        //update link to this file in referring files
+
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  // printLinks(): void {
+  //   Object.keys(this.fileSystem).forEach(fileName => {
+  //     console.log(`------------${fileName}---------------`);
+  //     console.log(this.fileSystem[fileName].links);
+  //     console.log('-----------------------------------------------');
   //   });
   // }
-
-  printLinks(): void {
-    Object.keys(this.fileSystem).forEach(fileName => {
-      console.log(`------------${fileName}---------------`);
-      console.log(this.fileSystem[fileName].links);
-      console.log('-----------------------------------------------');
-    });
-  }
 }
-
-const umd = new UpMarkdown();
-umd.saveFiles(umd.getFilePaths('/home/gilwein/code/projects/upmarkdown/src/_testFileStructureFunctionality'));
-umd.findOutdatedLinks();
 
 
 /* [ToDo:]
 
-_Functionality_
-- VScode API: FS watcher for file rename/moved/deleted/edited(?).
-  - Add VS setting for time interval to scan fs
-
 _Bugs_
 - Fix bug: all files must have unique names.
 
-_Other_
+_UI_
 - Add UI to blacklist functionality? And then store blacklisted items by path instead of file name.
+  - change storage to global if using full paths instead of file names
+  - figure out how to add icon to blacklisted items in ui
+  - figure out how to change blacklist toggle to add/remove based on blacklist contents
 
 _Extension Process_
 - Update Links:
   - FS scan to derive storage
-    - if file already exists in storage: crypto changed ? scan file : skip
   - Update all outdated links
-  - Timestamp of when this function was run
 
 - Watch Directory:
-  - If storage doesn't exists || timestamp < x : Update Links func
-  - File changes:
+  - Update Links functionality
+  - Watch for file changes:
     - rename: change key of file in storage if doesn't already exist, otherwise notify user of duplicate
     - moved: change path of file in storage, update links of referred files and referring files
     - deleted: delete from storage
