@@ -1,13 +1,13 @@
 import * as fs from 'fs';
 import * as p from 'path';
-import * as c from 'crypto';
+// import * as c from 'crypto';
 const partition = require('lodash.partition');
 
 export interface IPaths {
   [filePath: string]: {
     path: string;
-    directory: string;
-    hash: string;
+    // directory: string;
+    // hash: string;
     links: {
       [fileName: string]: {
         linkInstances: [{
@@ -26,17 +26,14 @@ export type IBlacklist = { [filePath: string]: null };
 export class UpMarkdown {
   private static readonly RE: RegExp = new RegExp(/\[.+?\](\(|:\s)(?!https?|www|ftps?)([^\)|\s|#]+\.(md|png))/, 'g');
   private changeLog: string = '';
-  // dir: string = '';
   fileSystem: IPaths;
   blacklist: IBlacklist;
 
   constructor(
-    // dirInput?: string,
     dbInput?: IPaths,
     blacklistInput?: IBlacklist
   ) {
     this.blacklist = typeof blacklistInput !== 'undefined' ? blacklistInput : {} as IBlacklist;
-    // this.dir = typeof dirInput !== 'undefined' ? dirInput : '';
     if (typeof dbInput !== 'undefined') {
       this.fileSystem = dbInput;
     } else {
@@ -72,31 +69,36 @@ export class UpMarkdown {
 
   //save the file's data in storage
   saveFiles(files: string[]): IPaths {
-    const saveFile = (name: string, path: string, directory: string, hash: string): void => {
+    const saveFile = (
+      name: string,
+      path: string,
+      // directory: string,
+      // hash: string
+    ): void => {
       this.fileSystem[name] = {
-        hash,
+        // hash,
+        // directory,
         path,
-        directory,
         links: /^.+\.md$/.test(name) ? this.extractLinks(path) : {}
       };
     };
     files.forEach((filePath: string) => {
       const fileName = p.basename(filePath);
-      const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
-      const directory = p.dirname(filePath);
-      if (typeof this.fileSystem[fileName] !== 'undefined') {
-        if (this.fileSystem[fileName].hash !== hash) {
-          if (this.fileSystem[fileName].directory !== p.dirname(filePath)) {
-            // same name
-            return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
-            // refactor to save to array if multiple file names are the same
-          } else {
-            // same file
-            return saveFile(fileName, filePath, directory, hash);
-          }
-        }
-      }
-      saveFile(fileName, filePath, directory, hash);
+      // const hash = c.createHash('md5').update(fs.readFileSync(filePath, 'utf8')).digest("hex");
+      // const directory = p.dirname(filePath);
+      // if (typeof this.fileSystem[fileName] !== 'undefined') {
+      //   if (this.fileSystem[fileName].hash !== hash) {
+      //     if (this.fileSystem[fileName].directory !== p.dirname(filePath)) {
+      //       // same name
+      //       return console.error(`Duplicate '${fileName}' already exists in storage. Please rename the file to have a unique name.`);
+      //       // refactor to save to array if multiple file names are the same
+      //     } else {
+      //       // same file
+      //       return saveFile(fileName, filePath, directory, hash);
+      //     }
+      //   }
+      // }
+      saveFile(fileName, filePath);
     });
     return this.fileSystem;
   }
@@ -134,7 +136,7 @@ export class UpMarkdown {
   ////////////////////////////////////////////////////////////////////////////
 
   //find outdated links to all files or specified files
-  findOutdatedLinks(files: string[] = []): void {
+  findOutdatedLinks(files: string[] = []) {
     let fileChanges: [string, number][] = [];
     files = files.length > 0 ? files : Object.keys(this.fileSystem);
     files.forEach((fileName) => {
@@ -160,12 +162,14 @@ export class UpMarkdown {
       this.updateLinks(fileName, fileChanges);
       fileChanges = [];
     });
-    this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('No links were updated.');
-    this.changeLog = '';
+    setTimeout(_ => { //why does this.changeLog require a setTimeout to print correctly?
+      this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('No links were updated.');
+      this.changeLog = '';
+    }, 1000);
   }
 
   //update links to current file
-  updateLinks(fileName: string, fileChanges: [string, number][]) {
+  async updateLinks(fileName: string, fileChanges: [string, number][]) {
     if (fileChanges.length === 0) { return; }
     let changeLog: string = `- File '${fileName}' link changes:\n`;
 
@@ -173,7 +177,7 @@ export class UpMarkdown {
       throw console.error(`Error ${operation} ${fileName}: \n${err}`);
     };
 
-    let fileData: string = fs.readFileSync(this.fileSystem[fileName].path, 'utf8');
+    let fileData: string = await fs.readFileSync(this.fileSystem[fileName].path, 'utf8');
 
     fs.open(this.fileSystem[fileName].path, 'r+', (err, fd) => {
       if (err) { throwError('opening', err); }
@@ -236,7 +240,9 @@ export class UpMarkdown {
   }
 }
 
-
+const umd = new UpMarkdown();
+umd.saveFiles(umd.getFilePaths('/home/gilwein/code/projects/upmarkdown/src/_testFileStructureFunctionality'));
+umd.findOutdatedLinks();
 
 
 /* [ToDo:]

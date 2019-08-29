@@ -19,19 +19,19 @@
   "contributes": {
     "commands": [{
         "command": "extension.startFsWatch",
-        "title": "upMarkdown: Start FileSystem Updater"
+        "title": "Start Continuous Link Updater"
       },
       {
         "command": "extension.stopFsWatch",
-        "title": "upMarkdown: Stop FileSystem Updater"
+        "title": "Stop Continuous Link Updater"
       },
       {
         "command": "extension.updateLinks",
-        "title": "upMarkdown: Update Links"
+        "title": "Update Links"
       },
       {
         "command": "extension.toggleBlacklist",
-        "title": "upMarkdown: Toggle Blacklist"
+        "title": "Add/Remove to Link Updater Blacklist"
       }
     ],
     "menus": {
