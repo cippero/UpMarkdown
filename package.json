@@ -17,7 +17,8 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [{
+    "commands": [
+      {
         "command": "extension.startFsWatch",
         "title": "Start Continuous Link Updater"
       },
@@ -35,7 +36,8 @@
       }
     ],
     "menus": {
-      "explorer/context": [{
+      "explorer/context": [
+        {
           "command": "extension.startFsWatch",
           "group": "1_modification@1",
           "when": "explorerResourceIsFolder"
@@ -61,7 +63,9 @@
       "properties": {
         "upMarkdown.blacklist": {
           "type": "array",
-          "default": ["archive"],
+          "default": [
+            "archive"
+          ],
           "scope": "window",
           "description": "Specifies which files and folders should be ignored."
         },

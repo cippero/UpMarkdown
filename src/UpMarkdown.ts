@@ -36,7 +36,7 @@ export class UpMarkdown {
   private changeLog: string = '';
   fileSystem: IPaths;
   blacklist: IBlacklist;
-  // private watcherChanges: { filePath: string, action: Watcher }[] = [];
+  watcherEvents: { action: Watcher, filePath: string }[] = [];
 
   constructor(fileSystemInput?: IPaths, blacklistInput?: IBlacklist) {
     this.blacklist = typeof blacklistInput !== 'undefined' ? blacklistInput : {} as IBlacklist;
@@ -209,8 +209,57 @@ export class UpMarkdown {
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 
+  // determine which event to trigger
+  runActions() {
+    console.log(this.watcherEvents);
+    const runAction = (action?: Watcher, filePath?: string, oldFilePath?: string) => {
+      if (typeof oldFilePath !== 'undefined') { this.watchFiles(action!, filePath!, oldFilePath); }
+      else if (this.watcherEvents.length > 1) {
+        this.watcherEvents.forEach(event => { this.watchFiles(event.action, event.filePath); });
+      } else { this.watchFiles(action!, filePath!); }
+      this.watcherEvents = [];
+    };
+    if (this.watcherEvents.length === 0) { return; }
+    if (this.watcherEvents.length === 2) {
+      const events = [this.watcherEvents[0].action, this.watcherEvents[1].action];
+      if (events.includes(Watcher.Create) && events.includes(Watcher.Delete)) {
+        let oldPathIndex: number = 0;
+        const newPath = this.watcherEvents.find((e, i) => {
+          oldPathIndex = i;
+          return e.action === Watcher.Create;
+        });
+        if (p.dirname(this.watcherEvents[0].filePath) === p.dirname(this.watcherEvents[1].filePath)) {
+          console.log('rename');
+          runAction(Watcher.Rename, newPath!.filePath, this.watcherEvents[1 - oldPathIndex].filePath)
+          // this.watcherEvents = [];
+          // this.watchFiles(Watcher.Rename, newPath!.filePath, this.watcherEvents[1 - oldPathIndex].filePath);
+        } else {
+          console.log('move');
+          runAction(Watcher.Move, newPath!.filePath);
+          // this.watcherEvents = [];
+          // this.watchFiles(Watcher.Move, newPath!.filePath);
+        }
+      } else {
+        console.log('forEach');
+        runAction();
+        // this.watcherEvents.forEach(event => {
+        //   this.watchFiles(event.action, event.filePath);
+        // });
+        // this.watcherEvents = [];
+      }
+    } else {
+      console.log('forEach');
+      runAction();
+      // this.watcherEvents.forEach(event => {
+      //   this.watchFiles(event.action, event.filePath);
+      // });
+      // this.watcherEvents = [];
+    }
+  }
+
   // watch for file events
   watchFiles(action: Watcher, filePath: string, oldFilePath?: string): void {
+    console.log('triggered');
     const fileName = p.basename(filePath);
     switch (action) {
       case Watcher.Change:
