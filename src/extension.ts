@@ -36,12 +36,17 @@ export function activate(context: vscode.ExtensionContext) {
       const pattern = new vscode.RelativePattern(path, "{**/*.md,**/*.png}");
       watcher = vscode.workspace.createFileSystemWatcher(pattern); //glob search string
       const delayMS: number = 250;
-      const runEvent = (action: Watcher, filePath: string, delay: number) => {
-        umd.watcherEvents.push({ action, filePath });
-        setTimeout(() => { umd.determineEvent(); }, delay);
+
+      const runEvent = (action: Watcher, filePath: string, delay?: number) => {
+        if (typeof delay !== 'undefined') {
+          umd.watcherEvents.push({ action, filePath });
+          setTimeout(() => { umd.determineEvent(); }, delay);
+        } else {
+          umd.watchFiles(action, filePath);
+        }
       };
 
-      watcher.onDidChange((e) => { umd.watchFiles(Watcher.Change, e.path); });
+      watcher.onDidChange((e) => { runEvent(Watcher.Change, e.path); });
       watcher.onDidCreate((e) => { runEvent(Watcher.Create, e.path, delayMS); });
       watcher.onDidDelete((e) => { runEvent(Watcher.Delete, e.path, delayMS * 2); });
     })
