@@ -35,65 +35,15 @@ export function activate(context: vscode.ExtensionContext) {
 
       const pattern = new vscode.RelativePattern(path, "{**/*.md,**/*.png}");
       watcher = vscode.workspace.createFileSystemWatcher(pattern); //glob search string
-
-      // const determineAction = (action: Watcher, filePath: string) => {
-      //   if (elapsed === 0 || Date.now() - elapsed <= limit) {
-      //     console.log('rename or move');
-      //     watcherChanges.push({ action, filePath });
-      //     elapsed = Date.now();
-      //   } else {
-      //     console.log('not rename or move');
-      //     umd.watchFiles(action, filePath);
-      //   }
-      // };
-
-      // let watcherChanges: { filePath: string, action: Watcher }[] = [];
-      // let elapsed: number = 0;
-
-      // const determineAction = (action: Watcher, filePath: string) => {
-      //   const executeAction = () => {
-      //     let oldPathIndex: number = 0;
-      //     const newPath = watcherChanges.find((e, i) => {
-      //       oldPathIndex = i;
-      //       return e.action === Watcher.Create;
-      //     });
-      //     if (watcherChanges.length === 2 && typeof newPath !== 'undefined') {
-      //       if (p.dirname(watcherChanges[0].filePath) === p.dirname(watcherChanges[1].filePath)) {
-      //         umd.watchFiles(Watcher.Rename, newPath.filePath, watcherChanges[1 - oldPathIndex].filePath);
-      //       } else {
-      //         umd.watchFiles(Watcher.Move, newPath.filePath);
-      //       }
-      //       // refactor ">=2" and "elapsed === limit * 2"
-      //     } else if (watcherChanges.length >= 2) {
-      //       watcherChanges.forEach(e => { umd.watchFiles(e.action, e.filePath); });
-      //     } else if (watcherChanges.length === 1) {
-      //       umd.watchFiles(watcherChanges[0].action, watcherChanges[0].filePath);
-      //     }
-      //     watcherChanges = [];
-      //     elapsed = 0;
-      //   };
-
-      //   const limit: number = 500;
-      //   // if 2 events (CREATE + DELETE) trigger in less than this amount of ms, the event is rename/move  
-      //   if (elapsed === 0 || Date.now() - elapsed <= limit) {
-      //     watcherChanges.push({ action, filePath });
-      //     elapsed = Date.now();
-      //   } else {
-      //     umd.watchFiles(action, filePath);
-      //   }
-      // };
+      const delayMS: number = 250;
+      const runEvent = (action: Watcher, filePath: string, delay: number) => {
+        umd.watcherEvents.push({ action, filePath });
+        setTimeout(() => { umd.determineEvent(); }, delay);
+      };
 
       watcher.onDidChange((e) => { umd.watchFiles(Watcher.Change, e.path); });
-      watcher.onDidCreate((e) => {
-        // utils.addAction(Watcher.Create, e.path, umd);
-        umd.watcherEvents.push({ action: Watcher.Create, filePath: e.path });
-        setTimeout(() => { umd.runActions(); }, 250);
-      });
-      watcher.onDidDelete((e) => {
-        // utils.addAction(Watcher.Delete, e.path, umd);
-        umd.watcherEvents.push({ action: Watcher.Delete, filePath: e.path });
-        setTimeout(() => { umd.runActions(); }, 2500);
-      });
+      watcher.onDidCreate((e) => { runEvent(Watcher.Create, e.path, delayMS); });
+      watcher.onDidDelete((e) => { runEvent(Watcher.Delete, e.path, delayMS * 2); });
     })
   );
 
