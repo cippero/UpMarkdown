@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as p from 'path';
 // import * as c from 'crypto';
+import { replaceKey, removeKey } from './utils/utils';
 const partition = require('lodash.partition');
 
 export interface IPaths {
@@ -147,6 +148,7 @@ export class UpMarkdown {
 
       links.forEach((link) => {
         if (typeof this.fileSystem[link] === 'undefined') {
+          //add to misfits obj
           return console.error(`'${fileName}': Skipping the link to '${link}': a file with that name doesn't exist in storage.`);
         }
         const newLinkPath: string = p.relative(this.fileSystem[fileName].path.substring(
@@ -165,6 +167,10 @@ export class UpMarkdown {
       this.updateLinks(fileName, fileChanges);
       fileChanges = [];
     });
+    this.outputFileChanges();
+  }
+
+  outputFileChanges() {
     setTimeout(_ => { //why does this.changeLog require a setTimeout to print correctly?
       this.changeLog.length > 0 ? console.log(this.changeLog) : console.log('No links were updated.');
       this.changeLog = '';
@@ -197,6 +203,9 @@ export class UpMarkdown {
         offset += inst.newLinkPath.length - inst.oldLinkPath.length;
 
         changeLog += `  Link to '${linkInstance[0]}' @${inst.locationInFile}:\n    '${inst.oldLinkPath}' --> '${inst.newLinkPath}'\n`;
+
+        // inst.oldLinkPath = inst.newLinkPath;
+        // inst.newLinkPath = '';
       });
 
       // fs.writeFile(this.fileSystem[fileName].path, fileData, (err) => { if (err) { throwError('writing to', err); } });
@@ -206,6 +215,36 @@ export class UpMarkdown {
       this.changeLog += changeLog;
     });
   }
+
+  // updateReferringFiles(filePath: string, oldFileName: string) {
+  //   /*
+  //   - find all files that refer to the old fileName
+  //   - update the link in fs to reflect the new fileName
+  //   - update the link in each file
+  //   */
+  //   console.log('updating referring files');
+  //   const fileName: string = p.basename(filePath);
+  //   let filesToUpdate: IPaths['filePath']['links'] = {};
+  //   // let fileChanges: [string, number][] = [];
+
+  //   // forEach file, if file has referring link to this file, add to fileChanges
+  //   const files: string[] = Object.keys(this.fileSystem).filter((file: string) => {
+  //     return typeof this.fileSystem[file].links[oldFileName] !== 'undefined';
+  //   });
+
+  //   files.forEach((file: string) => {
+  //     filesToUpdate[file] = this.fileSystem[file].links[oldFileName];
+  //   });
+
+  //   for (let file in filesToUpdate) {
+  //     console.log(`fileName: ${file}. Links:`);
+  //     console.log(this.fileSystem[file]);
+  //     console.log('----------------');
+  //   }
+
+  //   this.updateLinks();
+  //   this.outputFileChanges();
+  // }
 
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
@@ -262,26 +301,73 @@ export class UpMarkdown {
         console.log(`DELETE ${filePath}`);
 
         //filter filePath out of this.fileSystem
-        this.fileSystem = ((file: string, { [file]: old, ...others }) => {
-          return { ...others };
-        })(fileName, this.fileSystem);
+        // this.fileSystem = ((file: string, { [file]: old, ...others }) => {
+        //   return { ...others };
+        // })(fileName, this.fileSystem);
+        this.fileSystem = removeKey(fileName, this.fileSystem);
 
         //output log of broken links to this file
 
         break;
 
       case Watcher.Rename:
-        console.log(`RENAME ${filePath} \nOld name: ${p.basename(oldFilePath!)}`);
+        const oldFileName = p.basename(oldFilePath!);
+        console.log(`RENAME ${filePath} \nOld name: ${oldFileName}`);
 
-        // check if fileName already exists in storage
+        if (typeof this.fileSystem[fileName] !== 'undefined') {
+          console.error(`All files should have unique names. A file by the name of '${fileName}' already exists in storage, it will be overwritten.`);
+        }
 
         //update the file in storage
-        this.fileSystem = ((oldFileName: string, newFileName: string, { [oldFileName]: old, ...others }) => {
-          return { [newFileName]: old, ...others };
-        })(p.basename(oldFilePath!), fileName, this.fileSystem);
+        // this.fileSystem = ((oldFileName: string, newFileName: string, { [oldFileName]: old, ...others }) => {
+        //   return { [newFileName]: old, ...others };
+        // })(oldFileName, fileName, this.fileSystem);
+        this.fileSystem = replaceKey(oldFileName, fileName, this.fileSystem);
         this.fileSystem[fileName].path = filePath;
 
         //update link to this file in referring files
+        // this.updateReferringFiles(filePath, oldFileName);
+
+        // let filesToUpdate: IPaths['filePath']['links'] = {};
+
+        // forEach file, if file has referring link to this file, add to fileChanges
+        const files: string[] = Object.keys(this.fileSystem).filter((file: string) => {
+          return typeof this.fileSystem[file].links[oldFileName] !== 'undefined';
+        });
+
+        let fileChanges: [string, number][] = [];
+
+        files.forEach((fileToUpdate: string) => {
+          // filesToUpdate[file] = this.fileSystem[file].links[oldFileName];
+
+          console.log(this.fileSystem[fileToUpdate]);
+
+          // this.fileSystem[fileToUpdate].links = ((file: string, { [file]: old, ...others }) => {
+          //   return { [fileName]: old, ...others };
+          // })(oldFileName, this.fileSystem[fileToUpdate].links);
+          let links = this.fileSystem[fileToUpdate].links;
+          links = replaceKey(oldFileName, fileName, links);
+
+          this.fileSystem[fileToUpdate].links[fileName].linkInstances.map((inst, i) => {
+            let index: number = inst.newLinkPath.lastIndexOf('/') + 1;
+            inst.newLinkPath = inst.newLinkPath.substring(0, index) + fileName;
+            fileChanges.push([fileName, i]);
+          });
+
+          this.updateLinks(fileName, fileChanges);
+          fileChanges = [];
+
+
+          console.log(this.fileSystem[fileToUpdate]);
+
+          // this.fileSystem = ((file: string, { [file]: old, ...others }) => {
+          //   // old.links = ((file: string, { [file]: old, ...others }) => {
+          //   //   return { ...others };
+          //   // })(oldFileName, old);
+          //   return { , ...others };
+          // })(fileToUpdate, this.fileSystem);
+        });
+        this.outputFileChanges();
 
         break;
 

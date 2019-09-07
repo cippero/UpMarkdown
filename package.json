@@ -17,8 +17,7 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
+    "commands": [{
         "command": "extension.startFsWatch",
         "title": "Start Continuous Link Updater"
       },
@@ -36,8 +35,7 @@
       }
     ],
     "menus": {
-      "explorer/context": [
-        {
+      "explorer/context": [{
           "command": "extension.startFsWatch",
           "group": "1_modification@1",
           "when": "explorerResourceIsFolder"
@@ -68,12 +66,6 @@
           ],
           "scope": "window",
           "description": "Specifies which files and folders should be ignored."
-        },
-        "upMarkdown.scanInterval": {
-          "type": "number",
-          "default": 60,
-          "scope": "window",
-          "description": "If more seconds have passed since the last time the file system was scanned than the interval value, the file system will be scanned again. This setting only applies when turning on the automatic FS Watcher."
         }
       }
     }

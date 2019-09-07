@@ -69,4 +69,13 @@ export class Utils {
     blacklistArr.forEach((item: any) => { blacklist[item] = null; });
     return Promise.resolve(blacklist);
   }
+
 }
+
+export const replaceKey = (
+  oldKey: string, newKey: string, { [oldKey]: old, ...others }
+): {} => ({ [newKey]: old, ...others });
+
+export const removeKey = (
+  key: string, { [key]: old, ...others }
+): {} => ({ ...others });
